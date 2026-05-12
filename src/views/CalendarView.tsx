@@ -14,17 +14,19 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isSameDay, 
-  addMonths, 
-  subMonths 
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameMonth,
+  isSameDay,
+  addMonths,
+  subMonths,
+  addWeeks,
+  subWeeks,
 } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -60,6 +62,8 @@ export const CalendarView = React.memo(({
   setIsDialogOpen,
   getPriorityColor
 }: CalendarViewProps) => {
+  const [viewMode, setViewMode] = React.useState<'month' | 'week'>('month');
+  const [currentWeek, setCurrentWeek] = React.useState(new Date());
   const todayStr = React.useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   
   const calendarData = React.useMemo(() => {
@@ -71,7 +75,15 @@ export const CalendarView = React.memo(({
     return { calendarDays, monthStart };
   }, [currentMonth]);
 
+  const weekData = React.useMemo(() => {
+    const weekStart = startOfWeek(currentWeek);
+    const weekEnd = endOfWeek(currentWeek);
+    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+    return { weekDays, weekStart };
+  }, [currentWeek]);
+
   const { calendarDays, monthStart } = calendarData;
+  const { weekDays, weekStart } = weekData;
 
   const selectedDayTasks = React.useMemo(() => {
     if (!selectedCalendarDay) return [];
@@ -92,26 +104,86 @@ export const CalendarView = React.memo(({
             </p>
           )}
         </div>
-        <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-            <ChevronRight className="w-4 h-4 rotate-180" />
-          </Button>
-          <Button variant="ghost" className="h-8 text-xs font-bold" onClick={() => { setCurrentMonth(new Date()); setSelectedCalendarDay(null); }}>
-            Today
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+        <div className="flex gap-2 items-center">
+          {/* Mobile View Toggle */}
+          <div className="flex md:hidden gap-1 p-0.5 bg-slate-100 rounded-lg">
+            <button
+              onClick={() => setViewMode('month')}
+              className={cn(
+                'px-2 py-1 text-xs font-bold rounded-md transition-all',
+                viewMode === 'month'
+                  ? 'bg-white text-primary shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              Month
+            </button>
+            <button
+              onClick={() => setViewMode('week')}
+              className={cn(
+                'px-2 py-1 text-xs font-bold rounded-md transition-all',
+                viewMode === 'week'
+                  ? 'bg-white text-primary shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              Week
+            </button>
+          </div>
+
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                if (viewMode === 'month') {
+                  setCurrentMonth(subMonths(currentMonth, 1));
+                } else {
+                  setCurrentWeek(subWeeks(currentWeek, 1));
+                }
+              }}
+            >
+              <ChevronRight className="w-4 h-4 rotate-180" />
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-8 text-xs font-bold"
+              onClick={() => {
+                const today = new Date();
+                setCurrentMonth(today);
+                setCurrentWeek(today);
+                setSelectedCalendarDay(null);
+              }}
+            >
+              Today
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                if (viewMode === 'month') {
+                  setCurrentMonth(addMonths(currentMonth, 1));
+                } else {
+                  setCurrentWeek(addWeeks(currentWeek, 1));
+                }
+              }}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="flex-1 flex gap-6 overflow-hidden">
-        <Card className={cn(
-          "flex-1 border-slate-100 shadow-sm overflow-hidden transition-all duration-500",
-          selectedCalendarDay ? "lg:flex-[2]" : "flex-1"
-        )}>
-          <CardContent className="p-0 h-full flex flex-col">
-            <div className="grid grid-cols-7 border-b border-slate-50">
+        {viewMode === 'month' ? (
+          <Card className={cn(
+            "flex-1 border-slate-100 shadow-sm overflow-hidden transition-all duration-500",
+            selectedCalendarDay ? "lg:flex-[2]" : "flex-1"
+          )}>
+            <CardContent className="p-0 h-full flex flex-col">
+              <div className="grid grid-cols-7 border-b border-slate-50">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                 <div key={day} className="p-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
                   {day}
@@ -184,7 +256,71 @@ export const CalendarView = React.memo(({
               })}
             </div>
           </CardContent>
-        </Card>
+          </Card>
+        ) : (
+          <Card className="flex-1 border-slate-100 shadow-sm overflow-hidden transition-all duration-500 md:flex-[2]">
+            <CardContent className="p-0 h-full flex flex-col">
+              {/* Week View Header */}
+              <div className="grid grid-cols-7 border-b border-slate-50">
+                {weekDays.map(day => (
+                  <div key={day.toString()} className="p-2 text-center border-r border-slate-50 last:border-r-0">
+                    <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+                      {format(day, 'EEE')}
+                    </div>
+                    <div className={cn(
+                      "text-sm font-black w-6 h-6 flex items-center justify-center rounded-full mx-auto transition-colors",
+                      isSameDay(day, new Date()) && "bg-primary text-white shadow-md",
+                      selectedCalendarDay && isSameDay(day, selectedCalendarDay) && !isSameDay(day, new Date()) && "bg-slate-800 text-white"
+                    )}>
+                      {format(day, 'd')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Week Grid */}
+              <div className="flex-1 grid grid-cols-7">
+                {weekDays.map(day => {
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const dayTasks = tasks.filter(t => t.dueDate === dateStr);
+
+                  return (
+                    <div
+                      key={day.toString()}
+                      onClick={() => setSelectedCalendarDay(day)}
+                      className={cn(
+                        'p-2 border-r border-b border-slate-50 last:border-r-0 cursor-pointer transition-all hover:bg-slate-50/80 overflow-hidden',
+                        selectedCalendarDay && isSameDay(day, selectedCalendarDay) && 'bg-primary/5 ring-2 ring-inset ring-primary/20'
+                      )}
+                    >
+                      <div className="space-y-1">
+                        {dayTasks.slice(0, 4).map(t => (
+                          <div
+                            key={t.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTask(t);
+                              setIsDialogOpen(true);
+                            }}
+                            className={cn(
+                              'text-[8px] px-1 py-0.5 rounded-sm border border-slate-100 bg-white truncate font-black hover:border-primary/50 transition-colors',
+                              t.completed && 'opacity-40 grayscale line-through'
+                            )}
+                          >
+                            {t.title}
+                          </div>
+                        ))}
+                        {dayTasks.length > 4 && (
+                          <p className="text-[7px] text-slate-400 font-bold ml-1">+{dayTasks.length - 4}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <AnimatePresence>
           {selectedCalendarDay && (

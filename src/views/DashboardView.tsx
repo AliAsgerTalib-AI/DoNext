@@ -7,6 +7,10 @@ import * as React from 'react';
 import {
   Eye,
   Link,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Lock,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -35,6 +39,23 @@ interface DashboardViewProps {
 
 const TASK_ROW_HEIGHT = 44;
 
+const StatCard = ({ icon: Icon, label, value, color }: { icon: any; label: string; value: number; color: string }) => {
+  const colorClasses = {
+    blue: 'bg-blue-50 border-blue-100 text-blue-600',
+    green: 'bg-emerald-50 border-emerald-100 text-emerald-600',
+    red: 'bg-red-50 border-red-100 text-red-600',
+    amber: 'bg-amber-50 border-amber-100 text-amber-600',
+  };
+
+  return (
+    <div className={`flex flex-col items-center justify-center p-2 rounded-lg border ${colorClasses[color as keyof typeof colorClasses]}`}>
+      <Icon className="w-4 h-4 mb-1 opacity-70" />
+      <span className="text-lg font-black">{value}</span>
+      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+    </div>
+  );
+};
+
 export const DashboardView = React.memo(({
   tasks,
   filteredTasks,
@@ -59,8 +80,32 @@ export const DashboardView = React.memo(({
     overscan: 5,
   });
 
+  // Calculate stats from all tasks
+  const todayStr = new Date().toISOString().split('T')[0];
+  const stats = React.useMemo(() => {
+    const pending = tasks.filter(t => !t.completed).length;
+    const completed = tasks.filter(t => t.completed).length;
+    const overdue = tasks.filter(t => !t.completed && t.dueDate && t.dueDate < todayStr).length;
+    const blocked = tasks.filter(t => {
+      if (!t.dependencyIds || t.dependencyIds.length === 0) return false;
+      return t.dependencyIds.some(depId => {
+        const dep = tasks.find(d => d.id === depId);
+        return dep && !dep.completed;
+      });
+    }).length;
+    return { pending, completed, overdue, blocked };
+  }, [tasks]);
+
   return (
     <div className="flex-1 m-0 flex flex-col gap-4 overflow-hidden animate-in fade-in duration-500">
+      {/* Mobile Stats Cards */}
+      <div className="grid grid-cols-4 gap-2 lg:hidden px-0">
+        <StatCard icon={Clock} label="Active" value={stats.pending} color="blue" />
+        <StatCard icon={CheckCircle2} label="Done" value={stats.completed} color="green" />
+        <StatCard icon={AlertCircle} label="Overdue" value={stats.overdue} color="red" />
+        <StatCard icon={Lock} label="Blocked" value={stats.blocked} color="amber" />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Task List */}
         <div className="lg:col-span-2 space-y-4">
@@ -74,10 +119,29 @@ export const DashboardView = React.memo(({
               </p>
             </div>
             
-            <div className="flex gap-2 p-1 bg-slate-100 rounded-xl scale-90 origin-right">
-              <Button variant={activeFilter === 'all' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveFilter('all')} className={cn("h-8 rounded-lg text-xs font-bold", activeFilter !== 'all' && "text-slate-400")}>All</Button>
-              <Button variant={activeFilter === 'active' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveFilter('active')} className={cn("h-8 rounded-lg text-xs font-bold", activeFilter !== 'active' && "text-slate-400")}>Pending</Button>
-              <Button variant={activeFilter === 'completed' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveFilter('completed')} className={cn("h-8 rounded-lg text-xs font-bold", activeFilter !== 'completed' && "text-slate-400")}>Done</Button>
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-2 px-2">
+              {[
+                { value: 'all', label: 'All' },
+                { value: 'active', label: 'Active' },
+                { value: 'completed', label: 'Done' },
+                { value: 'urgent', label: 'Urgent' },
+                { value: 'blocked', label: 'Blocked' },
+                { value: 'overdue', label: 'Overdue' },
+                { value: 'unscheduled', label: 'Unsched.' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setActiveFilter(value)}
+                  className={cn(
+                    'shrink-0 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tight transition-all whitespace-nowrap',
+                    activeFilter === value
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
