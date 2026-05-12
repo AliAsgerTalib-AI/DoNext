@@ -33,23 +33,28 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Priority, RecurrenceFrequency, Task, Subtask, DEFAULT_CATEGORIES } from '@/src/types';
+import { Priority, RecurrenceFrequency, Task, Subtask, Category } from '@/src/types';
 
 interface TaskFormProps {
   initialTask?: Task | null;
-  onSave: (task: Partial<Task>) => void;
+  onSave: (task: Partial<Task>, applyToFuture?: boolean) => void;
   onCancel: () => void;
   onDelete?: (id: string) => void;
   allTasks?: Task[];
+  categories?: Category[];
   defaultDate?: Date;
   [key: string]: any; 
 }
 
-export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [], defaultDate }: TaskFormProps) {
+export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [], categories = [], defaultDate }: TaskFormProps) {
   const [subtasks, setSubtasks] = React.useState<Subtask[]>(initialTask?.subtasks || []);
   const [newSubtaskTitle, setNewSubtaskTitle] = React.useState('');
   const [isRepeatable, setIsRepeatable] = React.useState(initialTask?.isRepeatable || false);
   const [isWatched, setIsWatched] = React.useState(initialTask?.isWatched || false);
+  const [priority, setPriority] = React.useState<Priority>(initialTask?.priority || 'medium');
+  const [category, setCategory] = React.useState<string>(initialTask?.category || 'personal');
+  const [frequency, setFrequency] = React.useState<RecurrenceFrequency>(initialTask?.frequency || 'daily');
+  const [applyToFuture, setApplyToFuture] = React.useState(false);
   const [dueTime, setDueTime] = React.useState(initialTask?.dueTime || '');
   const [dependencyIds, setDependencyIds] = React.useState<string[]>(initialTask?.dependencyIds || []);
   const parseDateString = (dateStr: string | null | undefined) => {
@@ -75,19 +80,21 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
     onSave({
       title: formData.get('title') as string,
       description: formData.get('description') as string,
-      priority: formData.get('priority') as Priority,
-      category: formData.get('category') as string,
+      notes: formData.get('notes') as string,
+      priority,
+      category,
       dueDate: date ? format(date, 'yyyy-MM-dd') : null,
       dueTime: dueTime || null,
       isRepeatable,
       isWatched,
-      frequency: isRepeatable ? (formData.get('frequency') as RecurrenceFrequency) : 'none',
+      frequency: isRepeatable ? frequency : 'none',
       recurrenceStart: isRepeatable && recurrenceStartDate ? format(recurrenceStartDate, 'yyyy-MM-dd') : null,
       recurrenceEnd: isRepeatable && recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : null,
+      recurrenceGroupId: initialTask?.recurrenceGroupId || null,
       occurrences: isRepeatable ? (formData.get('occurrences') ? parseInt(formData.get('occurrences') as string) : null) : null,
       subtasks,
       dependencyIds,
-    });
+    }, applyToFuture);
   };
 
   const addSubtask = () => {
@@ -128,13 +135,20 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
 
           <div className="space-y-2">
             <Label htmlFor="description" className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Description</Label>
-            <Textarea id="description" name="description" defaultValue={initialTask?.description} placeholder="Add more details about this task..." className="rounded-xl border-slate-100 focus-visible:ring-primary/20 min-h-[100px] resize-none" />
+            <Textarea id="description" name="description" defaultValue={initialTask?.description} placeholder="Add more details about this task..." className="rounded-xl border-slate-100 focus-visible:ring-primary/20 min-h-[80px] resize-none" />
           </div>
+
+          {(initialTask ? !initialTask.completed : true) && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+              <Label htmlFor="notes" className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Notes</Label>
+              <Textarea id="notes" name="notes" defaultValue={initialTask?.notes} placeholder="Quick notes for this instance..." className="rounded-xl border-slate-100 focus-visible:ring-primary/20 min-h-[80px] resize-none bg-slate-50/50" />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="priority" className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Priority</Label>
-              <Select name="priority" defaultValue={initialTask?.priority || 'medium'}>
+              <Select value={priority} onValueChange={(val: Priority) => setPriority(val)}>
                 <SelectTrigger className="rounded-xl border-slate-100 h-11">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -148,12 +162,12 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
 
             <div className="space-y-2">
               <Label htmlFor="category" className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Category</Label>
-              <Select name="category" defaultValue={initialTask?.category || 'personal'}>
+              <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger className="rounded-xl border-slate-100 h-11">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {DEFAULT_CATEGORIES.map(cat => (
+                  {categories.map(cat => (
                     <SelectItem key={cat.id} value={cat.id}>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
@@ -170,18 +184,20 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
             <div className="space-y-2 flex flex-col">
               <Label htmlFor="dueDate" className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Due Date</Label>
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal h-11 rounded-xl border-slate-100 bg-white",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
-                    {date ? format(date, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-11 rounded-xl border-slate-100 bg-white",
+                        !date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+                      {date ? format(date, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  }
+                />
                 <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl border-slate-100" align="start">
                   <Calendar
                     mode="single"
@@ -235,7 +251,7 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
             >
                 <div className="space-y-2">
                   <Label htmlFor="frequency" className="text-[10px] font-bold text-primary uppercase">Frequency</Label>
-                  <Select name="frequency" defaultValue={initialTask?.frequency || 'daily'}>
+                  <Select value={frequency} onValueChange={(val: RecurrenceFrequency) => setFrequency(val)}>
                     <SelectTrigger className="rounded-xl border-slate-100 h-10 bg-white shadow-sm">
                       <SelectValue placeholder="Select frequency" />
                     </SelectTrigger>
@@ -251,18 +267,20 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
                   <div className="space-y-1.5 flex flex-col">
                     <Label className="text-[10px] font-bold text-primary uppercase">Start</Label>
                     <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal h-10 rounded-xl border-slate-100 bg-white",
-                            !recurrenceStartDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                          {recurrenceStartDate ? format(recurrenceStartDate, "MM/dd/yy") : <span>Start</span>}
-                        </Button>
-                      </PopoverTrigger>
+                      <PopoverTrigger
+                        render={
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal h-10 rounded-xl border-slate-100 bg-white",
+                              !recurrenceStartDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                            {recurrenceStartDate ? format(recurrenceStartDate, "MM/dd/yy") : <span>Start</span>}
+                          </Button>
+                        }
+                      />
                       <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl transition-all" align="start">
                         <Calendar
                           mode="single"
@@ -277,18 +295,20 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
                   <div className="space-y-1.5 flex flex-col">
                     <Label className="text-[10px] font-bold text-primary uppercase">Ends</Label>
                     <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal h-10 rounded-xl border-slate-100 bg-white",
-                            !recurrenceEndDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                          {recurrenceEndDate ? format(recurrenceEndDate, "MM/dd/yy") : <span>Indefinite</span>}
-                        </Button>
-                      </PopoverTrigger>
+                      <PopoverTrigger
+                        render={
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal h-10 rounded-xl border-slate-100 bg-white",
+                              !recurrenceEndDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                            {recurrenceEndDate ? format(recurrenceEndDate, "MM/dd/yy") : <span>Indefinite</span>}
+                          </Button>
+                        }
+                      />
                       <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl transition-all" align="start">
                         <Calendar
                           mode="single"
@@ -321,12 +341,14 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
             </div>
             <div className="space-y-2">
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal h-11 rounded-xl border-slate-100 bg-white">
-                    <Plus className="mr-2 h-4 w-4" />
-                    <span>Select requirements...</span>
-                  </Button>
-                </PopoverTrigger>
+                <PopoverTrigger
+                  render={
+                    <Button variant="outline" className="w-full justify-start text-left font-normal h-11 rounded-xl border-slate-100 bg-white">
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span>Select requirements...</span>
+                    </Button>
+                  }
+                />
                 <PopoverContent className="w-80 p-0 rounded-2xl shadow-xl border-slate-100" align="start">
                   <ScrollArea className="h-60 p-4">
                     <div className="space-y-2">

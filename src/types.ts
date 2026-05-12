@@ -28,6 +28,8 @@ export interface Task {
   recurrenceStart?: string | null;
   recurrenceEnd?: string | null;
   occurrences?: number | null;
+  recurrenceGroupId?: string | null;
+  notes?: string;
   isWatched: boolean;
   dependencyIds?: string[];
   createdAt: number;
