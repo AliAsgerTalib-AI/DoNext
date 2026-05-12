@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { X, Bug, Trash2, Database, Zap, ClipboardList } from 'lucide-react';
 import { Task, Category } from '../types';
 import { toast } from 'sonner';
@@ -138,5 +139,3 @@ export const DevTools = ({ tasks, categories, setTasks, setCategories }: DevTool
     </div>
   );
 };
-
-import { ScrollArea } from '@/components/ui/scroll-area';

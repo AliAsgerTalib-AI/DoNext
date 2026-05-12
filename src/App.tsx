@@ -4,9 +4,10 @@
  */
 
 import * as React from 'react';
-import { 
-  Plus, 
-  History
+import {
+  Plus,
+  History,
+  Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -30,15 +31,20 @@ import { DailyView } from './views/DailyView';
 import { CalendarView } from './views/CalendarView';
 import { DevTools } from './components/DevTools';
 import { Footer } from './components/Footer';
+import { AdvancedFilterBar } from './components/AdvancedFilterBar';
+import { SettingsModal } from './components/SettingsModal';
+import { BottomSheet } from './components/BottomSheet';
+import { QuickAddForm } from './components/QuickAddForm';
 import { Task, Category, Priority } from './types';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 
 export default function App() {
-  const { 
+  const {
     tasks, setTasks, addTask, updateTask, deleteTask, toggleTask, toggleSubtask,
-    categories, setCategories, addCategory, updateCategory, deleteCategory 
+    categories, setCategories, addCategory, updateCategory, deleteCategory,
+    undo, redo, canUndo, canRedo
   } = useTasks();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeCategory, setActiveCategory] = React.useState<string>('all');
@@ -52,46 +58,94 @@ export default function App() {
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
   const [selectedCalendarDay, setSelectedCalendarDay] = React.useState<Date | null>(null);
   const [selectedDailyDate, setSelectedDailyDate] = React.useState<Date>(new Date());
+  const [advancedFilters, setAdvancedFilters] = React.useState<{ dateFrom?: string; dateTo?: string; priorities?: Priority[] }>({});
+  const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = React.useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = React.useState(false);
+
+  const activeAdvancedFilterCount = React.useMemo(() => {
+    let count = 0;
+    if (advancedFilters.dateFrom) count++;
+    if (advancedFilters.dateTo) count++;
+    if (advancedFilters.priorities?.length) count++;
+    return count;
+  }, [advancedFilters]);
 
   const filteredTasks = React.useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    return tasks.filter(task => {
-      const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           task.description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = activeCategory === 'all' || task.category === activeCategory;
-      
+
+    const matchesSearchFilter = (task: Task) =>
+      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategoryFilter = (task: Task) =>
+      activeCategory === 'all' || task.category === activeCategory;
+
+    const getTaskStatus = (task: Task) => {
       const isToday = task.dueDate === todayStr;
       const isOverdue = task.dueDate && task.dueDate < todayStr && !task.completed;
       const isUnscheduled = !task.dueDate;
-      const isBlocked = task.dependencyIds && task.dependencyIds.some(id => {
+      const isBlocked = task.dependencyIds?.some(id => {
         const dep = tasks.find(t => t.id === id);
         return dep && !dep.completed;
-      });
-      
-      const matchesFilter = activeFilter === 'all' || 
-                           (activeFilter === 'active' && !task.completed) || 
-                           (activeFilter === 'completed' && task.completed) ||
-                           (activeFilter === 'urgent' && task.priority === 'high') ||
-                           (activeFilter === 'blocked' && isBlocked) ||
-                           (activeFilter === 'overdue' && isOverdue) ||
-                           (activeFilter === 'unscheduled' && isUnscheduled);
-      
-      // In Dashboard view, we usually show today's tasks OR a specific smart folder
-      const isInDashboardMode = activeFilter === 'all' || activeFilter === 'active' || activeFilter === 'completed' || activeFilter === 'urgent';
-      const showTodayOnly = isInDashboardMode && activeCategory !== 'smart'; 
+      }) || false;
 
-      if (showTodayOnly) {
-        return matchesSearch && matchesCategory && matchesFilter && isToday;
+      return { isToday, isOverdue, isUnscheduled, isBlocked };
+    };
+
+    const matchesStatusFilter = (task: Task) => {
+      const { isToday, isOverdue, isUnscheduled, isBlocked } = getTaskStatus(task);
+
+      switch (activeFilter) {
+        case 'all':
+          return true;
+        case 'active':
+          return !task.completed;
+        case 'completed':
+          return task.completed;
+        case 'urgent':
+          return task.priority === 'high';
+        case 'blocked':
+          return isBlocked;
+        case 'overdue':
+          return isOverdue;
+        case 'unscheduled':
+          return isUnscheduled;
+        default:
+          return true;
       }
-      
-      return matchesSearch && (activeCategory === 'all' || activeCategory === 'smart') && matchesFilter;
-    }).sort((a, b) => {
-      if (a.dueTime && b.dueTime) return a.dueTime.localeCompare(b.dueTime);
-      if (a.dueTime) return -1;
-      if (b.dueTime) return 1;
-      return 0;
-    });
-  }, [tasks, searchQuery, activeCategory, activeFilter]);
+    };
+
+    const showTodayOnlyMode = ['all', 'active', 'completed', 'urgent'].includes(activeFilter);
+
+    return tasks
+      .filter(task => {
+        if (!matchesSearchFilter(task)) return false;
+        if (!matchesCategoryFilter(task)) return false;
+        if (!matchesStatusFilter(task)) return false;
+
+        // In dashboard mode, only show today's tasks (unless a smart folder is active)
+        if (showTodayOnlyMode && activeCategory !== 'smart') {
+          return getTaskStatus(task).isToday;
+        }
+
+        return true;
+      })
+      .filter(task => {
+        // Advanced filters
+        if (advancedFilters.dateFrom && (!task.dueDate || task.dueDate < advancedFilters.dateFrom)) return false;
+        if (advancedFilters.dateTo && (!task.dueDate || task.dueDate > advancedFilters.dateTo)) return false;
+        if (advancedFilters.priorities?.length && !advancedFilters.priorities.includes(task.priority)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        if (a.dueTime && b.dueTime) return a.dueTime.localeCompare(b.dueTime);
+        if (a.dueTime) return -1;
+        if (b.dueTime) return 1;
+        return 0;
+      });
+  }, [tasks, searchQuery, activeCategory, activeFilter, advancedFilters]);
 
   const watchedTasks = React.useMemo(() => {
     return tasks
@@ -187,11 +241,35 @@ export default function App() {
     toast.error('Task deleted');
   }, [deleteTask]);
 
+  const handleNavigateToTask = React.useCallback((taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task) setEditingTask(task);
+  }, [tasks]);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+        toast.info('Undone', { duration: 1500 });
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+        toast.info('Redone', { duration: 1500 });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden font-sans">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-background overflow-hidden font-sans">
       <Toaster />
-      
-      <Sidebar 
+
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
         activeCategory={activeCategory}
         setActiveCategory={setActiveCategory}
         activeFilter={activeFilter}
@@ -201,17 +279,33 @@ export default function App() {
         onEditCategory={handleEditCategory}
       />
 
-      <DevTools 
-        tasks={tasks} 
-        categories={categories} 
-        setTasks={setTasks} 
-        setCategories={setCategories} 
+      <DevTools
+        tasks={tasks}
+        categories={categories}
+        setTasks={setTasks}
+        setCategories={setCategories}
       />
 
       <main className="flex-1 flex flex-col min-w-0 bg-[#f7fafd]">
-        <Header 
+        <Header
+          onMenuClick={() => setIsSidebarOpen(true)}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          isAdvancedFilterOpen={isAdvancedFilterOpen}
+          onToggleAdvancedFilter={() => setIsAdvancedFilterOpen(v => !v)}
+          activeAdvancedFilterCount={activeAdvancedFilterCount}
+          onUndo={undo}
+          onRedo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
+
+        <AdvancedFilterBar
+          filters={advancedFilters}
+          onChange={setAdvancedFilters}
+          onClear={() => { setAdvancedFilters({}); setIsAdvancedFilterOpen(false); }}
+          isVisible={isAdvancedFilterOpen}
         />
 
         <Tabs defaultValue="focus" className="flex-1 overflow-hidden flex flex-col p-4 max-w-[1200px] mx-auto w-full gap-4">
@@ -238,15 +332,16 @@ export default function App() {
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden rounded-3xl h-[90vh] max-h-[850px] shadow-2xl border-none">
-                <TaskForm 
+                <TaskForm
                   key={editingTask?.id || 'new'}
-                  initialTask={editingTask} 
-                  onSave={handleSaveTask} 
-                  onCancel={handleTaskFormCancel} 
+                  initialTask={editingTask}
+                  onSave={handleSaveTask}
+                  onCancel={handleTaskFormCancel}
                   allTasks={tasks}
                   categories={categories}
                   defaultDate={selectedCalendarDay || undefined}
                   onDelete={handleTaskFormDelete}
+                  onNavigateToTask={handleNavigateToTask}
                 />
               </DialogContent>
             </Dialog>
@@ -303,6 +398,38 @@ export default function App() {
         <Footer />
       </main>
 
+      {/* Mobile FAB Button */}
+      <motion.button
+        onClick={() => setIsBottomSheetOpen(true)}
+        className="fixed bottom-6 right-6 z-30 hidden max-md:flex h-14 w-14 rounded-full bg-primary shadow-lg items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <Plus className="h-6 w-6 text-white" />
+      </motion.button>
+
+      {/* Mobile Bottom Sheet Quick-Add */}
+      <BottomSheet
+        open={isBottomSheetOpen}
+        onClose={() => setIsBottomSheetOpen(false)}
+        title="Quick Add Task"
+      >
+        <QuickAddForm
+          onAdd={(taskData) => {
+            addTask(taskData);
+            toast.success('Task added');
+            setIsBottomSheetOpen(false);
+          }}
+          onMoreOptions={() => {
+            setIsBottomSheetOpen(false);
+            setEditingTask(null);
+            setIsDialogOpen(true);
+          }}
+          onClose={() => setIsBottomSheetOpen(false)}
+          defaultDate={selectedCalendarDay || undefined}
+        />
+      </BottomSheet>
+
       {/* Repeat Confirmation Dialog */}
       <Dialog open={showRepeatPrompt} onOpenChange={setShowRepeatPrompt}>
         <DialogContent className="sm:max-w-[400px] p-6 rounded-3xl">
@@ -350,7 +477,7 @@ export default function App() {
       {/* Category Management Dialog */}
       <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
         <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden rounded-3xl border-none shadow-2xl">
-          <CategoryForm 
+          <CategoryForm
             key={editingCategory?.id || 'new-cat'}
             initialCategory={editingCategory}
             onCancel={() => setIsCategoryDialogOpen(false)}
@@ -376,6 +503,16 @@ export default function App() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        tasks={tasks}
+        categories={categories}
+        setTasks={setTasks}
+        setCategories={setCategories}
+      />
     </div>
   );
 }

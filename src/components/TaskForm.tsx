@@ -34,6 +34,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Priority, RecurrenceFrequency, Task, Subtask, Category } from '@/src/types';
+import { DependencyGraph } from '@/src/components/DependencyGraph';
 
 interface TaskFormProps {
   initialTask?: Task | null;
@@ -43,10 +44,11 @@ interface TaskFormProps {
   allTasks?: Task[];
   categories?: Category[];
   defaultDate?: Date;
-  [key: string]: any; 
+  key?: string | number;
+  onNavigateToTask?: (taskId: string) => void;
 }
 
-export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [], categories = [], defaultDate }: TaskFormProps) {
+export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [], categories = [], defaultDate, onNavigateToTask }: TaskFormProps) {
   const [subtasks, setSubtasks] = React.useState<Subtask[]>(initialTask?.subtasks || []);
   const [newSubtaskTitle, setNewSubtaskTitle] = React.useState('');
   const [isRepeatable, setIsRepeatable] = React.useState(initialTask?.isRepeatable || false);
@@ -76,9 +78,18 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    
+
+    const title = (formData.get('title') as string)?.trim();
+    if (!title) {
+      return;
+    }
+
+    if (isRepeatable && !frequency) {
+      return;
+    }
+
     onSave({
-      title: formData.get('title') as string,
+      title,
       description: formData.get('description') as string,
       notes: formData.get('notes') as string,
       priority,
@@ -435,6 +446,22 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
                 ))}
               </AnimatePresence>
             </div>
+
+            {/* Dependency Graph Panel */}
+            {initialTask && allTasks.length > 0 && (
+              <div className="space-y-2 px-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">
+                  Dependency Map
+                </Label>
+                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                  <DependencyGraph
+                    task={initialTask}
+                    allTasks={allTasks}
+                    onNavigateToTask={onNavigateToTask}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </ScrollArea>

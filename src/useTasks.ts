@@ -5,15 +5,17 @@
 
 import * as React from 'react';
 import { Task, Category, Priority, DEFAULT_CATEGORIES } from './types';
-import { addDays, addMonths, format, parseISO, isBefore, isSameDay } from 'date-fns';
+import { addDays, format } from 'date-fns';
+import { generateRecurringTasks, parseDateString } from './lib/recurringTasks';
+import { useHistory } from './hooks/useHistory';
 
 export function useTasks() {
-  const [tasks, setTasks] = React.useState<Task[]>(() => {
+  const { state: tasks, set: setTasks, setSilent: setTasksSilent, undo: undoTasks, redo: redoTasks, canUndo: canUndoTasks, canRedo: canRedoTasks } = useHistory<Task[]>(() => {
     const saved = localStorage.getItem('chronos-tasks');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [categories, setCategories] = React.useState<Category[]>(() => {
+  const { state: categories, set: setCategories, setSilent: setCategoriesSilent, undo: undoCategories, redo: redoCategories, canUndo: canUndoCategories, canRedo: canRedoCategories } = useHistory<Category[]>(() => {
     const saved = localStorage.getItem('chronos-categories');
     return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
   });
@@ -34,18 +36,15 @@ export function useTasks() {
       try {
         if (e.key === 'chronos-tasks' && e.newValue) {
           const newTasks = JSON.parse(e.newValue);
-          // Only update if data is actually different to avoid infinite loops or unnecessary renders
-          setTasks(prev => {
-            if (JSON.stringify(prev) === e.newValue) return prev;
-            return newTasks;
-          });
+          if (JSON.stringify(tasks) !== JSON.stringify(newTasks)) {
+            setTasksSilent(newTasks);
+          }
         }
         if (e.key === 'chronos-categories' && e.newValue) {
           const newCategories = JSON.parse(e.newValue);
-          setCategories(prev => {
-            if (JSON.stringify(prev) === e.newValue) return prev;
-            return newCategories;
-          });
+          if (JSON.stringify(categories) !== JSON.stringify(newCategories)) {
+            setCategoriesSilent(newCategories);
+          }
         }
       } catch (err) {
         console.error('Error parsing synced storage data:', err);
@@ -54,7 +53,7 @@ export function useTasks() {
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  }, [tasks, categories, setTasksSilent, setCategoriesSilent]);
 
   const addCategory = React.useCallback((categoryData: Omit<Category, 'id'>) => {
     const newCategory: Category = {
@@ -69,20 +68,17 @@ export function useTasks() {
   }, []);
 
   const deleteCategory = React.useCallback((id: string) => {
-    // Check if any tasks are assigned to this category
-    // Note: This relies on 'tasks' which is in the scope. 
-    // To keep it stable, we use the functional update if possible or include tasks in dependencies.
-    setCategories(prev => {
-      const hasTasks = tasks.some(t => t.category === id);
+    setTasks(currentTasks => {
+      const hasTasks = currentTasks.some(t => t.category === id);
       if (hasTasks) {
         throw new Error('Cannot delete category with assigned tasks');
       }
-      return prev.filter(c => c.id !== id);
+      return currentTasks;
     });
-  }, [tasks]);
+    setCategories(prev => prev.filter(c => c.id !== id));
+  }, []);
 
   const addTask = React.useCallback((taskData: Partial<Task>) => {
-    const tasksToAdd: Task[] = [];
     const baseTask = {
       title: taskData.title || 'Untitled Task',
       description: taskData.description || '',
@@ -97,41 +93,28 @@ export function useTasks() {
       createdAt: Date.now(),
     };
 
+    let tasksToAdd: Task[] = [];
+
     if (taskData.isRepeatable && taskData.frequency && taskData.frequency !== 'none') {
       const recurrenceGroupId = crypto.randomUUID();
       const startStr = taskData.dueDate || format(new Date(), 'yyyy-MM-dd');
-      const [year, month, day] = startStr.split('-').map(Number);
-      const startDate = new Date(year, month - 1, day);
-      
-      let endDate: Date;
-      if (taskData.recurrenceEnd) {
-        const [eYear, eMonth, eDay] = taskData.recurrenceEnd.split('-').map(Number);
-        endDate = new Date(eYear, eMonth - 1, eDay);
-      } else {
-        endDate = addDays(startDate, 30);
-      }
+      const startDate = parseDateString(startStr)!;
+      const endDate = taskData.recurrenceEnd
+        ? parseDateString(taskData.recurrenceEnd)!
+        : addDays(startDate, 30);
 
-      let currentDate = startDate;
-      // Cap at 100 tasks to avoid accidental infinite loops or excessive data
-      let count = 0;
-      while ((isBefore(currentDate, endDate) || isSameDay(currentDate, endDate)) && count < 100) {
-        tasksToAdd.push({
+      tasksToAdd = generateRecurringTasks({
+        baseTask: {
           ...baseTask,
-          id: crypto.randomUUID(),
-          dueDate: format(currentDate, 'yyyy-MM-dd'),
-          isRepeatable: true,
-          frequency: taskData.frequency,
           recurrenceStart: taskData.recurrenceStart || null,
           recurrenceEnd: taskData.recurrenceEnd || null,
-          recurrenceGroupId,
-        } as Task);
-
-        if (taskData.frequency === 'daily') currentDate = addDays(currentDate, 1);
-        else if (taskData.frequency === 'weekly') currentDate = addDays(currentDate, 7);
-        else if (taskData.frequency === 'monthly') currentDate = addMonths(currentDate, 1);
-        else break;
-        count++;
-      }
+        } as Omit<Task, 'id' | 'dueDate'>,
+        frequency: taskData.frequency,
+        startDate,
+        endDate,
+        recurrenceGroupId,
+        occurrences: taskData.occurrences ?? null,
+      });
     } else {
       tasksToAdd.push({
         ...baseTask,
@@ -141,10 +124,16 @@ export function useTasks() {
         frequency: 'none',
       } as Task);
     }
-    
+
     setTasks(prev => [...tasksToAdd, ...prev]);
   }, []);
 
+  /**
+   * Updates a task with optional support for recurring task series.
+   * @param id Task ID to update
+   * @param updates Partial task object with fields to update
+   * @param applyToFuture If true and task is repeatable, apply updates to all future occurrences in the series
+   */
   const updateTask = React.useCallback((id: string, updates: Partial<Task>, applyToFuture: boolean = false) => {
     setTasks(prev => {
       const taskToUpdate = prev.find(t => t.id === id);
@@ -160,18 +149,17 @@ export function useTasks() {
         let foundFuture = false;
         const updatedTasks = prev.map(t => {
           if (t.id === id) return { ...t, ...updates, recurrenceGroupId: groupId };
-          
-          // Match by same recurrenceGroupId OR (if missing group ID) match by title and frequency if it's in the future
-          const isSameSeries = t.recurrenceGroupId === groupId || 
+
+          const isSameSeries = t.recurrenceGroupId === groupId ||
             (groupId && t.title === taskToUpdate.title && t.frequency === (updates.frequency || taskToUpdate.frequency) && t.isRepeatable);
 
           if (isSameSeries && t.dueDate && taskToUpdate.dueDate && t.dueDate > taskToUpdate.dueDate) {
             foundFuture = true;
-            const sharedFields = ['title', 'description', 'notes', 'priority', 'category', 'dueTime', 'subtasks', 'dependencyIds', 'isWatched'];
-            const futureUpdates: any = { recurrenceGroupId: groupId };
+            const sharedFields: (keyof Task)[] = ['title', 'description', 'notes', 'priority', 'category', 'dueTime', 'subtasks', 'dependencyIds', 'isWatched'];
+            const futureUpdates: Partial<Task> = { recurrenceGroupId: groupId };
             sharedFields.forEach(field => {
-              if (updates[field as keyof Task] !== undefined) {
-                futureUpdates[field] = updates[field as keyof Task];
+              if (updates[field] !== undefined) {
+                (futureUpdates as any)[field] = updates[field];
               }
             });
             return { ...t, ...futureUpdates };
@@ -179,39 +167,30 @@ export function useTasks() {
           return t;
         });
 
-        // If no future occurrences were found, create them for the next 30 days
         if (!foundFuture) {
           const newTaskTemplate = { ...taskToUpdate, ...updates, recurrenceGroupId: groupId };
           const frequency = newTaskTemplate.frequency;
           const startStr = newTaskTemplate.dueDate || format(new Date(), 'yyyy-MM-dd');
-          const [year, month, day] = startStr.split('-').map(Number);
-          const startDate = new Date(year, month - 1, day);
-          
+          const startDate = parseDateString(startStr)!;
+
           let currentDate = startDate;
           if (frequency === 'daily') currentDate = addDays(currentDate, 1);
           else if (frequency === 'weekly') currentDate = addDays(currentDate, 7);
-          else if (frequency === 'monthly') currentDate = addMonths(currentDate, 1);
-          else return updatedTasks; // Cannot repeat if frequency is none or invalid
+          else if (frequency === 'monthly') {
+            currentDate = new Date(startDate);
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          }
+          else return updatedTasks;
 
           const endDate = addDays(startDate, 30);
-          const tasksToAdd: Task[] = [];
-          
-          let count = 0;
-          while ((isBefore(currentDate, endDate) || isSameDay(currentDate, endDate)) && count < 100) {
-            tasksToAdd.push({
-              ...newTaskTemplate,
-              id: crypto.randomUUID(),
-              dueDate: format(currentDate, 'yyyy-MM-dd'),
-              completed: false,
-              createdAt: Date.now(),
-            } as Task);
-
-            if (frequency === 'daily') currentDate = addDays(currentDate, 1);
-            else if (frequency === 'weekly') currentDate = addDays(currentDate, 7);
-            else if (frequency === 'monthly') currentDate = addMonths(currentDate, 1);
-            else break;
-            count++;
-          }
+          const tasksToAdd = generateRecurringTasks({
+            baseTask: newTaskTemplate as Omit<Task, 'id' | 'dueDate'>,
+            frequency,
+            startDate: currentDate,
+            endDate,
+            recurrenceGroupId: groupId,
+            occurrences: newTaskTemplate.occurrences ?? null,
+          });
           return [...tasksToAdd, ...updatedTasks];
         }
 
@@ -242,8 +221,10 @@ export function useTasks() {
     }));
   }, []);
 
-  return { 
+  return {
     tasks, setTasks, addTask, updateTask, deleteTask, toggleTask, toggleSubtask,
-    categories, setCategories, addCategory, updateCategory, deleteCategory 
+    categories, setCategories, addCategory, updateCategory, deleteCategory,
+    undo: undoTasks, redo: redoTasks, canUndo: canUndoTasks, canRedo: canRedoTasks,
+    undoCategory: undoCategories, redoCategory: redoCategories, canUndoCategory: canUndoCategories, canRedoCategory: canRedoCategories
   };
 }

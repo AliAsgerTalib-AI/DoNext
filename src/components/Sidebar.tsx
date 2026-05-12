@@ -4,24 +4,27 @@
  */
 
 import * as React from 'react';
-import { 
-  LayoutDashboard, 
-  Clock, 
-  CheckCircle, 
-  AlertTriangle, 
-  History, 
-  Zap, 
-  Target, 
-  Plus, 
+import {
+  LayoutDashboard,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  History,
+  Zap,
+  Target,
+  Plus,
   Settings,
   CheckCircle2
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Category } from '@/src/types';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
   activeCategory: string;
   setActiveCategory: (cat: string) => void;
   activeFilter: string;
@@ -31,17 +34,37 @@ interface SidebarProps {
   onEditCategory: (cat: Category) => void;
 }
 
-export const Sidebar = React.memo(({ 
-  activeCategory, 
-  setActiveCategory, 
-  activeFilter, 
-  setActiveFilter, 
+export const Sidebar = React.memo(({
+  isOpen = false,
+  onClose,
+  activeCategory,
+  setActiveCategory,
+  activeFilter,
+  setActiveFilter,
   categories,
   onAddCategory,
   onEditCategory
 }: SidebarProps) => {
   return (
-    <aside className="w-52 bg-primary flex flex-col p-4 gap-6 shrink-0">
+    <AnimatePresence>
+      {/* Mobile Backdrop */}
+      {isOpen && onClose && (
+        <motion.div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        />
+      )}
+
+      <motion.aside
+        className="fixed md:static inset-y-0 left-0 z-50 w-52 bg-primary flex flex-col p-4 gap-6 shrink-0 md:z-auto transition-transform duration-300"
+        initial={{ x: -208 }}
+        animate={{ x: isOpen ? 0 : -208 }}
+        exit={{ x: -208 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      >
       <div className="flex items-center gap-2 px-1 mb-2 text-white">
         <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-lg">
           <CheckCircle2 className="w-5 h-5 text-primary" />
@@ -137,7 +160,8 @@ export const Sidebar = React.memo(({
           </ScrollArea>
         </div>
       </nav>
-    </aside>
+      </motion.aside>
+    </AnimatePresence>
   );
 });
 

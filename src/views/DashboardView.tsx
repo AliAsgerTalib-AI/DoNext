@@ -4,21 +4,17 @@
  */
 
 import * as React from 'react';
-import { 
-  Clock, 
-  Trash2,
+import {
   Eye,
   Link,
-  ArrowRight,
-  Pencil
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Task, Category, Priority } from '@/src/types';
+import { TaskRow } from '@/src/components/TaskRow';
 import { cn } from '@/lib/utils';
 
 interface DashboardViewProps {
@@ -37,6 +33,8 @@ interface DashboardViewProps {
   getPriorityColor: (priority: Priority) => string;
 }
 
+const TASK_ROW_HEIGHT = 44;
+
 export const DashboardView = React.memo(({
   tasks,
   filteredTasks,
@@ -52,6 +50,15 @@ export const DashboardView = React.memo(({
   setIsDialogOpen,
   getPriorityColor
 }: DashboardViewProps) => {
+  const parentRef = React.useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: filteredTasks.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => TASK_ROW_HEIGHT,
+    overscan: 5,
+  });
+
   return (
     <div className="flex-1 m-0 flex flex-col gap-4 overflow-hidden animate-in fade-in duration-500">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -74,118 +81,50 @@ export const DashboardView = React.memo(({
             </div>
           </div>
 
-          <ScrollArea className="h-[550px] pr-4">
-            <div className="space-y-0 pb-2">
-              <AnimatePresence mode="popLayout">
-                {filteredTasks.length > 0 ? (
-                  filteredTasks.map(task => {
-                    const isBlocked = task.dependencyIds && task.dependencyIds.some(id => {
-                      const dep = tasks.find(t => t.id === id);
-                      return dep && !dep.completed;
-                    });
-
-                    const category = categories.find(c => c.id === task.category);
-
-                    return (
-                      <motion.div key={task.id} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98 }} layout>
-                        <div 
-                          className={cn(
-                            "group flex items-center gap-3 py-2 px-1 border-b border-slate-100/60 transition-all hover:bg-slate-50/50",
-                            task.completed && "opacity-50 grayscale"
-                          )}
-                        >
-                          {/* Radio Button Style Toggle */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
-                            className={cn(
-                              "w-4 h-4 rounded-full border-2 transition-all flex items-center justify-center shrink-0",
-                              task.completed 
-                                ? "bg-primary border-primary" 
-                                : "border-slate-300 group-hover:border-primary/50"
-                            )}
-                          >
-                            {task.completed && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                          </button>
-
-                          <div className="flex-1 min-w-0 flex items-center justify-between gap-4">
-                            <div 
-                              className="flex-1 min-w-0 cursor-pointer"
-                              onClick={() => { setEditingTask(task); setIsDialogOpen(true); }}
-                            >
-                              <div className="flex items-center gap-2">
-                                <h3 className={cn(
-                                  "font-bold text-[12px] text-slate-800 truncate py-0.5",
-                                  task.completed && "line-through text-slate-400"
-                                )}>
-                                  {task.title}
-                                </h3>
-                                
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {task.dueTime && (
-                                    <div className="flex items-center text-[9px] font-black uppercase text-slate-400 tabular-nums">
-                                      <Clock className="w-2.5 h-2.5 mr-0.5 opacity-50" />
-                                      {task.dueTime}
-                                    </div>
-                                  )}
-                                  {isBlocked && !task.completed && (
-                                    <Badge variant="outline" className="h-4 px-1 text-[7px] font-black uppercase tracking-tighter text-amber-600 border-amber-200 bg-amber-50">
-                                      Blocked
-                                    </Badge>
-                                  )}
-                                  <div 
-                                    className="w-1.5 h-1.5 rounded-full" 
-                                    style={{ backgroundColor: category?.color }} 
-                                    title={category?.name}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {!task.completed && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-6 w-6 text-slate-400 hover:text-primary hover:bg-primary/5" 
-                                  title="Carry forward"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    carryforwardTask(task.id);
-                                  }}
-                                >
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </Button>
-                              )}
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 text-slate-400 hover:text-destructive hover:bg-destructive/5" 
-                                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 text-slate-400" 
-                                onClick={(e) => { e.stopPropagation(); setEditingTask(task); setIsDialogOpen(true); }}
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-20 text-slate-300 italic text-[11px] font-bold uppercase tracking-widest bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-100 mt-4">
-                    No tasks pending...
+          <div
+            ref={parentRef}
+            className="h-[550px] overflow-auto pr-4 animate-in fade-in duration-500"
+          >
+            {filteredTasks.length > 0 ? (
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map(virtualRow => (
+                  <div
+                    key={virtualRow.key}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                      height: `${TASK_ROW_HEIGHT}px`,
+                    }}
+                  >
+                    <TaskRow
+                      task={filteredTasks[virtualRow.index]}
+                      tasks={tasks}
+                      categories={categories}
+                      toggleTask={toggleTask}
+                      carryforwardTask={carryforwardTask}
+                      deleteTask={deleteTask}
+                      setEditingTask={setEditingTask}
+                      setIsDialogOpen={setIsDialogOpen}
+                      getPriorityColor={getPriorityColor}
+                    />
                   </div>
-                )}
-              </AnimatePresence>
-            </div>
-          </ScrollArea>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 text-slate-300 italic text-[11px] font-bold uppercase tracking-widest bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-100 mt-4">
+                No tasks pending...
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Watch Section */}

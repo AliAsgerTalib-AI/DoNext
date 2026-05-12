@@ -4,30 +4,111 @@
  */
 
 import * as React from 'react';
-import { Search } from 'lucide-react';
+import { Search, SlidersHorizontal, Settings, Undo2, Redo2, Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
+  onMenuClick?: () => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  isAdvancedFilterOpen?: boolean;
+  onToggleAdvancedFilter?: () => void;
+  activeAdvancedFilterCount?: number;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onOpenSettings?: () => void;
 }
 
-export const Header = React.memo(({ searchQuery, setSearchQuery }: HeaderProps) => {
+export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings }: HeaderProps) => {
   return (
-    <header className="h-20 border-b bg-card px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-100 shrink-0">
-      <div className="relative w-96 max-w-full">
+    <header className="h-14 md:h-20 border-b bg-card px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-100 shrink-0">
+      {/* Hamburger Menu - Mobile Only */}
+      {onMenuClick && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onMenuClick}
+          className="md:hidden h-10 w-10 rounded-lg shrink-0"
+          title="Menu"
+        >
+          <Menu className="w-5 h-5" />
+        </Button>
+      )}
+
+      <div className="relative w-full max-w-[180px] md:max-w-none md:w-96 ml-2 md:ml-0">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input 
-          className="pl-11 h-11 bg-slate-50 border-slate-100 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-xl font-medium" 
-          placeholder="Search tasks, categories..." 
+        <Input
+          className="pl-11 h-11 bg-slate-50 border-slate-100 focus-visible:ring-2 focus-visible:ring-primary/20 rounded-xl font-medium"
+          placeholder="Search tasks, categories..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
 
-      <div className="flex items-center gap-6">
-        <HeaderClock />
+      <div className="flex items-center gap-4">
+        {onToggleAdvancedFilter && (
+          <Button
+            variant={isAdvancedFilterOpen ? 'secondary' : 'ghost'}
+            size="icon"
+            onClick={onToggleAdvancedFilter}
+            className="relative h-11 w-11 rounded-xl"
+            title="Advanced Filters"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {activeAdvancedFilterCount && activeAdvancedFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                {activeAdvancedFilterCount}
+              </span>
+            )}
+          </Button>
+        )}
+
+        {onUndo && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onUndo}
+            disabled={!canUndo}
+            className="h-11 w-11 rounded-xl disabled:opacity-30"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-4 h-4" />
+          </Button>
+        )}
+
+        {onRedo && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onRedo}
+            disabled={!canRedo}
+            className="h-11 w-11 rounded-xl disabled:opacity-30"
+            title="Redo (Ctrl+Y)"
+          >
+            <Redo2 className="w-4 h-4" />
+          </Button>
+        )}
+
+        {onOpenSettings && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSettings}
+            className="h-11 w-11 rounded-xl"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        )}
+
+        <span className="hidden md:flex">
+          <HeaderClock />
+        </span>
       </div>
     </header>
   );
