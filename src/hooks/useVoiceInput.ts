@@ -157,7 +157,7 @@ interface UseVoiceInputReturn {
   stopListening: () => void;
 }
 
-export function useVoiceInput(onResult?: (transcript: string) => void): UseVoiceInputReturn {
+export function useVoiceInput(onResult?: (transcript: string) => void, onAutoStop?: (transcript: string) => void): UseVoiceInputReturn {
   const [isListening, setIsListening] = React.useState(false);
   const [transcript, setTranscript] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
@@ -284,6 +284,13 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
         if (timeSinceLastTranscript > silenceThreshold && shouldAutoStopRef.current) {
           console.log('🔇 Silence detected - auto-stopping microphone');
           shouldAutoStopRef.current = false;
+
+          // Trigger auto-stop callback with current transcript
+          if (transcript.trim()) {
+            console.log('📤 Triggering auto-stop with transcript:', transcript);
+            onAutoStop?.(transcript);
+          }
+
           recognitionRef.current?.abort();
         }
       }, 500);

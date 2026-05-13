@@ -40,7 +40,29 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
     setVoiceTranscript(transcript);
   }, []);
 
-  const { isListening, isSupported, startListening, stopListening, transcript: micTranscript } = useVoiceInput(handleVoiceResult);
+  const handleAutoStop = React.useCallback((transcript: string) => {
+    // Auto-stop triggered by silence detection
+    console.log('🔇 AUTO-STOP triggered with transcript:', transcript);
+    if (transcript.trim()) {
+      console.log('✅ PROCESSING auto-stop transcript:', transcript);
+      const taskData = parseVoiceTranscript(transcript);
+      console.log('✅ PARSED auto-stop data:', taskData);
+
+      if (onVoiceAdd) {
+        console.log('🔔 CALLING onVoiceAdd from auto-stop with:', taskData);
+        onVoiceAdd(taskData);
+        console.log('✔️ onVoiceAdd called successfully');
+      } else {
+        console.log('❌ ERROR: onVoiceAdd is undefined!');
+      }
+
+      toast.success(`Created: "${taskData.title}"`);
+      voiceTranscriptRef.current = '';
+      setVoiceTranscript('');
+    }
+  }, [onVoiceAdd]);
+
+  const { isListening, isSupported, startListening, stopListening, transcript: micTranscript } = useVoiceInput(handleVoiceResult, handleAutoStop);
 
   // When user clicks stop button, process the full transcript
   const handleMicClick = React.useCallback(() => {
