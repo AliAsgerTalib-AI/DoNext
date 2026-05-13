@@ -64,10 +64,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = React.useState(false);
-  const [currentTab, setCurrentTab] = React.useState<'focus' | 'daily' | 'calendar'>(() => {
-    const saved = localStorage.getItem('currentTab');
-    return (saved as 'focus' | 'daily' | 'calendar') || 'focus';
-  });
+  const [currentTab, setCurrentTab] = React.useState<'focus' | 'daily' | 'calendar'>('focus');
 
   const activeAdvancedFilterCount = React.useMemo(() => {
     let count = 0;

@@ -29,12 +29,17 @@ interface HeaderProps {
 }
 
 export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onVoiceAdd, onClockClick }: HeaderProps) => {
+  const stopListeningRef = React.useRef<(() => void) | null>(null);
+
   const handleVoiceResult = React.useCallback((transcript: string) => {
     const taskData = parseVoiceTranscript(transcript);
     onVoiceAdd?.(taskData);
+    // Auto-stop listening after a successful result
+    setTimeout(() => stopListeningRef.current?.(), 100);
   }, [onVoiceAdd]);
 
   const { isListening, isSupported, startListening, stopListening, error } = useVoiceInput(handleVoiceResult);
+  stopListeningRef.current = stopListening;
   return (
     <header className="h-14 md:h-20 border-b bg-card px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-100 shrink-0">
       {/* Hamburger Menu - Mobile Only */}

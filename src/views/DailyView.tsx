@@ -63,9 +63,10 @@ export const DailyView = React.memo(({
 
   const hasScrolledRef = React.useRef(false);
 
-  // Auto-scroll to current hour only once on initial mount when date is today
+  // Auto-scroll to current hour only on desktop when date is today
   React.useEffect(() => {
-    if (isSameDay(today, new Date()) && !hasScrolledRef.current) {
+    const isDesktop = window.innerWidth >= 768;
+    if (isSameDay(today, new Date()) && !hasScrolledRef.current && isDesktop) {
       const timer = setTimeout(() => {
         const currentHour = new Date().getHours();
         const element = document.getElementById(`daily-hour-${currentHour}`);

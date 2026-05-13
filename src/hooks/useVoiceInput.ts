@@ -92,8 +92,9 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
 
-    recognition.interimResults = false;
-    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 1;
     recognition.lang = 'en-US';
 
     recognition.onstart = () => {
@@ -103,16 +104,25 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
     };
 
     recognition.onresult = (event: any) => {
+      let interim = '';
       let final = '';
+
       for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript + ' ';
+          final += transcript + ' ';
+        } else {
+          interim += transcript + ' ';
         }
       }
-      if (final) {
-        const cleanedTranscript = final.trim();
-        setTranscript(cleanedTranscript);
-        onResultRef.current?.(cleanedTranscript);
+
+      const result = final.trim() || interim.trim();
+      if (result) {
+        setTranscript(result);
+        // Only call onResult when we have a final result
+        if (final.trim()) {
+          onResultRef.current?.(final.trim());
+        }
       }
     };
 
