@@ -33,14 +33,6 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
   const [voiceTranscript, setVoiceTranscript] = React.useState('');
   const voiceTranscriptRef = React.useRef('');
 
-  React.useEffect(() => {
-    console.log('🎤 Header rendering - Voice support:', {
-      onVoiceAdd: !!onVoiceAdd,
-      isListening: false,
-      micSupported: true
-    });
-  }, [onVoiceAdd]);
-
   const handleVoiceResult = React.useCallback((transcript: string) => {
     // Store in both state (for UI) and ref (for click handler)
     console.log('📝 Voice transcript:', transcript);
@@ -52,28 +44,35 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
 
   // When user clicks stop button, process the full transcript
   const handleMicClick = React.useCallback(() => {
-    console.log('🎤 Mic button clicked - isListening:', isListening, 'transcript from ref:', voiceTranscriptRef.current);
-
     if (isListening) {
       // User is stopping - process the voice input
       const transcript = voiceTranscriptRef.current;
-      console.log('⏹️ Stopping - transcript from ref:', transcript);
+      console.log('⏹️ STOPPING - transcript:', transcript);
+
       if (transcript.trim()) {
-        console.log('✅ Processing transcript:', transcript);
+        console.log('✅ PROCESSING:', transcript);
         const taskData = parseVoiceTranscript(transcript);
-        console.log('✅ Parsed task data:', taskData);
-        onVoiceAdd?.(taskData);
+        console.log('✅ PARSED DATA:', taskData);
+
+        if (onVoiceAdd) {
+          console.log('🔔 CALLING onVoiceAdd with:', taskData);
+          onVoiceAdd(taskData);
+          console.log('✔️ onVoiceAdd called successfully');
+        } else {
+          console.log('❌ ERROR: onVoiceAdd is undefined!');
+        }
+
         toast.success(`Created: "${taskData.title}"`);
         voiceTranscriptRef.current = '';
         setVoiceTranscript('');
       } else {
-        console.log('❌ No transcript found');
+        console.log('❌ NO TRANSCRIPT');
         toast.info('No speech detected');
       }
       stopListening();
     } else {
       // Start listening
-      console.log('▶️ Starting microphone');
+      console.log('▶️ STARTING MICROPHONE');
       voiceTranscriptRef.current = '';
       setVoiceTranscript('');
       startListening();
