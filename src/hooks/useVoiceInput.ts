@@ -1,7 +1,69 @@
 import React from 'react';
 import { Task } from '@/src/types';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parse, nextMonday, nextTuesday, nextWednesday, nextThursday, nextFriday, nextSaturday, nextSunday, isMonday, isTuesday, isWednesday, isThursday, isFriday, isSaturday, isSunday } from 'date-fns';
 import { toast } from 'sonner';
+
+function parseTime(timeStr: string): string | null {
+  const match = timeStr.match(/(\d{1,2})(?::(\d{2}))?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?/i);
+  if (!match) return null;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2] ? parseInt(match[2], 10) : 0;
+
+  // Check if PM
+  if (/p\.?m\.?|pm/i.test(timeStr)) {
+    if (hours !== 12) hours += 12;
+  } else if (/a\.?m\.?|am/i.test(timeStr)) {
+    if (hours === 12) hours = 0;
+  }
+
+  // Validate hours
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function parseDate(text: string): string | null {
+  const lowerText = text.toLowerCase();
+  const today = new Date();
+
+  // Day names
+  const dayMap: Record<string, (d: Date) => Date> = {
+    monday: nextMonday,
+    tuesday: nextTuesday,
+    wednesday: nextWednesday,
+    thursday: nextThursday,
+    friday: nextFriday,
+    saturday: nextSaturday,
+    sunday: nextSunday,
+  };
+
+  // Check for day names (Monday, Tuesday, etc.)
+  for (const [dayName, nextDayFn] of Object.entries(dayMap)) {
+    if (lowerText.includes(dayName)) {
+      const nextDay = nextDayFn(today);
+      return format(nextDay, 'yyyy-MM-dd');
+    }
+  }
+
+  // Check for month + day (e.g., "January 15", "Dec 25")
+  const monthMatch = text.match(/(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)/i);
+  if (monthMatch) {
+    try {
+      const day = monthMatch[1];
+      const month = monthMatch[2];
+      const dateStr = `${month} ${day} ${today.getFullYear()}`;
+      const parsed = parse(dateStr, 'MMM d yyyy', today);
+      return format(parsed, 'yyyy-MM-dd');
+    } catch (e) {
+      // Invalid date, skip
+    }
+  }
+
+  return null;
+}
 
 export function parseVoiceTranscript(text: string): Partial<Task> {
   const lowerText = text.toLowerCase();
@@ -14,15 +76,23 @@ export function parseVoiceTranscript(text: string): Partial<Task> {
     priority = 'low';
   }
 
-  // Extract due date
+  // Extract due date (check today/tomorrow first, then days, then months)
   let dueDate: string | null = null;
-  let dateText = '';
   if (/\btoday\b/.test(lowerText)) {
     dueDate = format(new Date(), 'yyyy-MM-dd');
-    dateText = 'today';
   } else if (/\btomorrow\b/.test(lowerText)) {
     dueDate = format(addDays(new Date(), 1), 'yyyy-MM-dd');
-    dateText = 'tomorrow';
+  } else {
+    // Try to parse day names or month + day
+    dueDate = parseDate(text);
+  }
+
+  // Extract time (e.g., "10am", "3:30pm", "14:00")
+  let dueTime: string | null = null;
+  const timeMatch = text.match(/(\d{1,2}):?(\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?/i);
+  if (timeMatch) {
+    const parsed = parseTime(timeMatch[0]);
+    if (parsed) dueTime = parsed;
   }
 
   // Extract category
@@ -40,7 +110,11 @@ export function parseVoiceTranscript(text: string): Partial<Task> {
   title = title
     .replace(/\b(high|urgent|important|low|medium|priority)\b/gi, '')
     .replace(/\b(today|tomorrow)\b/gi, '')
+    .replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/gi, '')
     .replace(/\b(work|shopping|shop|health|personal)\b/gi, '')
+    .replace(/(\d{1,2}):?(\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?/gi, '')
+    .replace(/\b(at|next)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -53,6 +127,7 @@ export function parseVoiceTranscript(text: string): Partial<Task> {
     title: title || 'Untitled Task',
     priority,
     dueDate,
+    dueTime,
     category,
   };
 }
@@ -137,27 +212,46 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      // Auto-restart listening to keep the mic active longer
+      // Unless the user has manually stopped it
+      if (recognitionRef.current && (recognitionRef.current as any).shouldContinue) {
+        try {
+          recognition.start();
+        } catch (e) {
+          // Already started or other error, ignore
+        }
+      } else {
+        setIsListening(false);
+      }
     };
 
+    (recognition as any).shouldContinue = true;
     recognitionRef.current = recognition;
 
     return () => {
+      (recognition as any).shouldContinue = false;
       recognition.abort();
     };
   }, [isSupported]);
 
   const startListening = React.useCallback(() => {
     if (recognitionRef.current && !isListening) {
-      recognitionRef.current.start();
+      (recognitionRef.current as any).shouldContinue = true;
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        // Already started or other error
+      }
     }
   }, [isListening]);
 
   const stopListening = React.useCallback(() => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
+    if (recognitionRef.current) {
+      (recognitionRef.current as any).shouldContinue = false;
+      recognitionRef.current.abort();
+      setIsListening(false);
     }
-  }, [isListening]);
+  }, []);
 
   return {
     isListening,
