@@ -31,6 +31,7 @@ interface HeaderProps {
 
 export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onVoiceAdd, onClockClick }: HeaderProps) => {
   const [voiceTranscript, setVoiceTranscript] = React.useState('');
+  const voiceTranscriptRef = React.useRef('');
 
   React.useEffect(() => {
     console.log('🎤 Header rendering - Voice support:', {
@@ -41,8 +42,9 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
   }, [onVoiceAdd]);
 
   const handleVoiceResult = React.useCallback((transcript: string) => {
-    // Accumulate transcripts as user speaks
+    // Store in both state (for UI) and ref (for click handler)
     console.log('📝 Voice transcript:', transcript);
+    voiceTranscriptRef.current = transcript;
     setVoiceTranscript(transcript);
   }, []);
 
@@ -50,17 +52,19 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
 
   // When user clicks stop button, process the full transcript
   const handleMicClick = React.useCallback(() => {
-    console.log('🎤 Mic button clicked - isListening:', isListening, 'transcript:', voiceTranscript);
+    console.log('🎤 Mic button clicked - isListening:', isListening, 'transcript from ref:', voiceTranscriptRef.current);
 
     if (isListening) {
       // User is stopping - process the voice input
-      console.log('⏹️ Stopping - voiceTranscript:', voiceTranscript);
-      if (voiceTranscript.trim()) {
-        console.log('✅ Processing transcript:', voiceTranscript);
-        const taskData = parseVoiceTranscript(voiceTranscript);
+      const transcript = voiceTranscriptRef.current;
+      console.log('⏹️ Stopping - transcript from ref:', transcript);
+      if (transcript.trim()) {
+        console.log('✅ Processing transcript:', transcript);
+        const taskData = parseVoiceTranscript(transcript);
         console.log('✅ Parsed task data:', taskData);
         onVoiceAdd?.(taskData);
         toast.success(`Created: "${taskData.title}"`);
+        voiceTranscriptRef.current = '';
         setVoiceTranscript('');
       } else {
         console.log('❌ No transcript found');
@@ -70,11 +74,12 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
     } else {
       // Start listening
       console.log('▶️ Starting microphone');
+      voiceTranscriptRef.current = '';
       setVoiceTranscript('');
       startListening();
       toast.info('Listening... speak now');
     }
-  }, [isListening, voiceTranscript, onVoiceAdd, stopListening, startListening]);
+  }, [isListening, onVoiceAdd, stopListening, startListening]);
   return (
     <header className="h-14 md:h-20 border-b bg-card px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-100 shrink-0">
       {/* Hamburger Menu - Mobile Only */}

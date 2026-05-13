@@ -158,6 +158,16 @@ export const SettingsModal = React.memo(({
     }
   }, [tasks, categories, setTasks, setCategories, onOpenChange]);
 
+  const [micPauseDuration, setMicPauseDuration] = React.useState(() => {
+    const saved = localStorage.getItem('micPauseDuration');
+    return saved ? parseInt(saved, 10) : 6;
+  });
+
+  const handleMicPauseDurationChange = (value: number) => {
+    setMicPauseDuration(value);
+    localStorage.setItem('micPauseDuration', String(value));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -166,6 +176,36 @@ export const SettingsModal = React.memo(({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Microphone Settings Section */}
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 mb-2">🎤 Microphone Settings</h3>
+              <p className="text-xs text-slate-500 mb-3">
+                Auto-stop recording after detecting silence.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">
+                Pause Duration: <span className="text-primary">{micPauseDuration}s</span>
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="15"
+                step="1"
+                value={micPauseDuration}
+                onChange={(e) => handleMicPauseDurationChange(Number(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
+              />
+              <p className="text-xs text-slate-500">
+                Microphone will automatically stop after {micPauseDuration} seconds of silence.
+              </p>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-slate-100" />
+
           {/* Backup Section */}
           <div className="space-y-3">
             <div>

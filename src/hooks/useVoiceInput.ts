@@ -148,6 +148,9 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
 
   const recognitionRef = React.useRef<any>(null);
   const onResultRef = React.useRef(onResult);
+  const lastTranscriptTimeRef = React.useRef<number>(0);
+  const silenceCheckIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const shouldAutoStopRef = React.useRef(false);
 
   const [isSupported] = React.useState(() => {
     if (typeof window === 'undefined') return false;
@@ -194,6 +197,8 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
       const result = final.trim() || interim.trim();
       if (result) {
         setTranscript(result);
+        // Update the last transcript time for silence detection
+        lastTranscriptTimeRef.current = Date.now();
         // Call onResult with whatever we have (interim or final)
         // This ensures we capture what the user is saying
         onResultRef.current?.(result);
@@ -227,6 +232,9 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
     recognitionRef.current = recognition;
 
     return () => {
+      if (silenceCheckIntervalRef.current) {
+        clearInterval(silenceCheckIntervalRef.current);
+      }
       try {
         recognition.abort();
       } catch (e) {
@@ -238,16 +246,42 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
   const startListening = React.useCallback(() => {
     if (recognitionRef.current && !isListening) {
       setError(null);
+      lastTranscriptTimeRef.current = Date.now();
+      shouldAutoStopRef.current = true;
+
       try {
         recognitionRef.current.start();
       } catch (e) {
         console.warn('Failed to start listening:', e);
       }
+
+      // Set up silence detection
+      if (silenceCheckIntervalRef.current) {
+        clearInterval(silenceCheckIntervalRef.current);
+      }
+
+      silenceCheckIntervalRef.current = setInterval(() => {
+        const micPauseDuration = parseInt(localStorage.getItem('micPauseDuration') || '6', 10);
+        const silenceThreshold = micPauseDuration * 1000; // Convert to milliseconds
+        const timeSinceLastTranscript = Date.now() - lastTranscriptTimeRef.current;
+
+        if (timeSinceLastTranscript > silenceThreshold && shouldAutoStopRef.current) {
+          console.log('🔇 Silence detected - auto-stopping microphone');
+          shouldAutoStopRef.current = false;
+          recognitionRef.current?.abort();
+        }
+      }, 500);
     }
   }, [isListening]);
 
   const stopListening = React.useCallback(() => {
+    if (silenceCheckIntervalRef.current) {
+      clearInterval(silenceCheckIntervalRef.current);
+      silenceCheckIntervalRef.current = null;
+    }
+
     if (recognitionRef.current) {
+      shouldAutoStopRef.current = false;
       try {
         recognitionRef.current.abort();
       } catch (e) {
