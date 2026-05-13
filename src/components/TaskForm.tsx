@@ -35,6 +35,9 @@ import {
 } from '@/components/ui/popover';
 import { Priority, RecurrenceFrequency, Task, Subtask, Category } from '@/src/types';
 import { DependencyGraph } from '@/src/components/DependencyGraph';
+import { parseDateString } from '@/src/lib/recurringTasks';
+import { SubtaskList } from '@/src/components/SubtaskList';
+import { RecurrenceSettings } from '@/src/components/RecurrenceSettings';
 
 interface TaskFormProps {
   initialTask?: Task | null;
@@ -50,7 +53,6 @@ interface TaskFormProps {
 
 export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [], categories = [], defaultDate, onNavigateToTask }: TaskFormProps) {
   const [subtasks, setSubtasks] = React.useState<Subtask[]>(initialTask?.subtasks || []);
-  const [newSubtaskTitle, setNewSubtaskTitle] = React.useState('');
   const [isRepeatable, setIsRepeatable] = React.useState(initialTask?.isRepeatable || false);
   const [isWatched, setIsWatched] = React.useState(initialTask?.isWatched || false);
   const [priority, setPriority] = React.useState<Priority>(initialTask?.priority || 'medium');
@@ -59,11 +61,6 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
   const [applyToFuture, setApplyToFuture] = React.useState(false);
   const [dueTime, setDueTime] = React.useState(initialTask?.dueTime || '');
   const [dependencyIds, setDependencyIds] = React.useState<string[]>(initialTask?.dependencyIds || []);
-  const parseDateString = (dateStr: string | null | undefined) => {
-    if (!dateStr) return undefined;
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
-  };
 
   const [date, setDate] = React.useState<Date | undefined>(
     initialTask?.dueDate ? parseDateString(initialTask.dueDate) : (defaultDate || new Date())
@@ -84,8 +81,16 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
       return;
     }
 
-    if (isRepeatable && !frequency) {
-      return;
+    // Validate repeatable task requirements
+    if (isRepeatable) {
+      if (!frequency || frequency === 'none') {
+        alert('⚠️ Please select a frequency (Daily, Weekly, or Monthly) for repeatable tasks');
+        return;
+      }
+      if (!recurrenceEndDate && !formData.get('occurrences')) {
+        alert('⚠️ Please set either an end date or occurrences limit for repeatable tasks');
+        return;
+      }
     }
 
     onSave({
@@ -106,24 +111,6 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
       subtasks,
       dependencyIds,
     }, applyToFuture);
-  };
-
-  const addSubtask = () => {
-    if (!newSubtaskTitle.trim()) return;
-    setSubtasks([...subtasks, { id: crypto.randomUUID(), title: newSubtaskTitle, completed: false }]);
-    setNewSubtaskTitle('');
-  };
-
-  const removeSubtask = (id: string) => {
-    setSubtasks(subtasks.filter(s => s.id !== id));
-  };
-
-  const clearSubtasks = () => {
-    setSubtasks([]);
-  };
-
-  const toggleSubtaskCompletion = (id: string) => {
-    setSubtasks(subtasks.map(s => s.id === id ? { ...s, completed: !s.completed } : s));
   };
 
   return (
@@ -255,96 +242,16 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
           </div>
 
           {isRepeatable && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }} 
-              animate={{ opacity: 1, height: 'auto' }} 
-              className="space-y-4 p-4 bg-primary/5 rounded-2xl border border-primary/10 overflow-hidden"
-            >
-                <div className="space-y-2">
-                  <Label htmlFor="frequency" className="text-[10px] font-bold text-primary uppercase">Frequency</Label>
-                  <Select value={frequency} onValueChange={(val: RecurrenceFrequency) => setFrequency(val)}>
-                    <SelectTrigger className="rounded-xl border-slate-100 h-10 bg-white shadow-sm">
-                      <SelectValue placeholder="Select frequency" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5 flex flex-col">
-                    <Label className="text-[10px] font-bold text-primary uppercase">Start</Label>
-                    <Popover>
-                      <PopoverTrigger
-                        render={
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal h-10 rounded-xl border-slate-100 bg-white",
-                              !recurrenceStartDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                            {recurrenceStartDate ? format(recurrenceStartDate, "MM/dd/yy") : <span>Start</span>}
-                          </Button>
-                        }
-                      />
-                      <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl transition-all" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={recurrenceStartDate}
-                          onSelect={setRecurrenceStartDate}
-                          className="rounded-2xl"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="space-y-1.5 flex flex-col">
-                    <Label className="text-[10px] font-bold text-primary uppercase">Ends</Label>
-                    <Popover>
-                      <PopoverTrigger
-                        render={
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal h-10 rounded-xl border-slate-100 bg-white",
-                              !recurrenceEndDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                            {recurrenceEndDate ? format(recurrenceEndDate, "MM/dd/yy") : <span>Indefinite</span>}
-                          </Button>
-                        }
-                      />
-                      <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl transition-all" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={recurrenceEndDate}
-                          onSelect={setRecurrenceEndDate}
-                          className="rounded-2xl"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="occurrences" className="text-[10px] font-bold text-primary uppercase">Limit Occurrences</Label>
-                  <Input 
-                    type="number" 
-                    id="occurrences" 
-                    name="occurrences" 
-                    defaultValue={initialTask?.occurrences || undefined} 
-                    placeholder="Unlimited" 
-                    className="rounded-xl border-slate-100 h-10 bg-white" 
-                  />
-                </div>
-              </motion.div>
-            )}
+            <RecurrenceSettings
+              frequency={frequency}
+              onFrequencyChange={setFrequency}
+              startDate={recurrenceStartDate}
+              onStartDateChange={setRecurrenceStartDate}
+              endDate={recurrenceEndDate}
+              onEndDateChange={setRecurrenceEndDate}
+              defaultOccurrences={initialTask?.occurrences}
+            />
+          )}
 
           <div className="space-y-4">
             <div className="flex items-center justify-between ml-1">
@@ -367,7 +274,7 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
                       {allTasks
                         .filter(t => t.id !== initialTask?.id)
                         .map(task => (
-                          <div key={task.id} className="flex items-center space-x-3 p-2 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer" onClick={() => {
+                          <button type="button" key={task.id} className="flex items-center space-x-3 p-2 hover:bg-slate-50 rounded-lg transition-colors text-left w-full" onClick={() => {
                             if (dependencyIds.includes(task.id)) {
                               setDependencyIds(dependencyIds.filter(id => id !== task.id));
                             } else {
@@ -376,7 +283,7 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
                           }}>
                             <Checkbox checked={dependencyIds.includes(task.id)} className="rounded-md" />
                             <span className="text-sm font-medium truncate">{task.title}</span>
-                          </div>
+                          </button>
                         ))}
                       {allTasks.length <= 1 && (
                         <p className="text-center py-8 text-xs text-slate-400">No other tasks available</p>
@@ -399,70 +306,26 @@ export function TaskForm({ initialTask, onSave, onCancel, onDelete, allTasks = [
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between ml-1">
-              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Subtasks ({subtasks.length})</Label>
-              {subtasks.length > 0 && (
-                <Button type="button" variant="ghost" size="sm" onClick={clearSubtasks} className="h-6 text-[10px] text-slate-400 hover:text-destructive">Clear all</Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Input 
-                value={newSubtaskTitle} 
-                onChange={(e) => setNewSubtaskTitle(e.target.value)} 
-                placeholder="Add a step..." 
-                className="rounded-xl border-slate-100 focus-visible:ring-primary/20 h-11"
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubtask())}
-              />
-              <Button type="button" size="icon" onClick={addSubtask} className="rounded-xl h-11 w-11 shadow-md shadow-primary/10">
-                <Plus className="h-5 w-5" />
-              </Button>
-            </div>
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-              <AnimatePresence mode="popLayout">
-                {subtasks.map(sub => (
-                  <motion.div 
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    key={sub.id} 
-                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 group hover:border-primary/20 transition-all shadow-sm"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <Checkbox 
-                        checked={sub.completed} 
-                        onCheckedChange={() => toggleSubtaskCompletion(sub.id)}
-                        className="h-4.5 w-4.5 rounded-md"
-                      />
-                      <span className={cn(
-                        "text-sm font-medium text-slate-700",
-                        sub.completed && "line-through text-slate-400"
-                      )}>{sub.title}</span>
-                    </div>
-                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-300 hover:text-destructive transition-colors" onClick={() => removeSubtask(sub.id)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+          <SubtaskList
+            subtasks={subtasks}
+            onChange={setSubtasks}
+          />
 
-            {/* Dependency Graph Panel */}
-            {initialTask && allTasks.length > 0 && (
-              <div className="space-y-2 px-2">
-                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">
-                  Dependency Map
-                </Label>
-                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                  <DependencyGraph
-                    task={initialTask}
-                    allTasks={allTasks}
-                    onNavigateToTask={onNavigateToTask}
-                  />
-                </div>
+          {/* Dependency Graph Panel */}
+          {initialTask && allTasks.length > 0 && (
+            <div className="space-y-2 px-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">
+                Dependency Map
+              </Label>
+              <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                <DependencyGraph
+                  task={initialTask}
+                  allTasks={allTasks}
+                  onNavigateToTask={onNavigateToTask}
+                />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
 

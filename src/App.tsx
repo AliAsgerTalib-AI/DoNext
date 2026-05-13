@@ -25,6 +25,7 @@ import { useTasks } from './useTasks';
 import { TaskForm } from './components/TaskForm';
 import { CategoryForm } from './components/CategoryForm';
 import { Sidebar } from './components/Sidebar';
+import { filterTasks } from './lib/taskFilters';
 import { Header } from './components/Header';
 import { DashboardView } from './views/DashboardView';
 import { DailyView } from './views/DailyView';
@@ -42,7 +43,7 @@ import { toast } from 'sonner';
 
 export default function App() {
   const {
-    tasks, setTasks, addTask, updateTask, deleteTask, toggleTask, toggleSubtask,
+    tasks, setTasks, addTask, updateTask, deleteTask, toggleTask, toggleSubtask, carryForwardIncompleteTasks,
     categories, setCategories, addCategory, updateCategory, deleteCategory,
     undo, redo, canUndo, canRedo
   } = useTasks();
@@ -63,6 +64,10 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = React.useState(false);
+  const [currentTab, setCurrentTab] = React.useState<'focus' | 'daily' | 'calendar'>(() => {
+    const saved = localStorage.getItem('currentTab');
+    return (saved as 'focus' | 'daily' | 'calendar') || 'focus';
+  });
 
   const activeAdvancedFilterCount = React.useMemo(() => {
     let count = 0;
@@ -74,77 +79,14 @@ export default function App() {
 
   const filteredTasks = React.useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-
-    const matchesSearchFilter = (task: Task) =>
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategoryFilter = (task: Task) =>
-      activeCategory === 'all' || task.category === activeCategory;
-
-    const getTaskStatus = (task: Task) => {
-      const isToday = task.dueDate === todayStr;
-      const isOverdue = task.dueDate && task.dueDate < todayStr && !task.completed;
-      const isUnscheduled = !task.dueDate;
-      const isBlocked = task.dependencyIds?.some(id => {
-        const dep = tasks.find(t => t.id === id);
-        return dep && !dep.completed;
-      }) || false;
-
-      return { isToday, isOverdue, isUnscheduled, isBlocked };
-    };
-
-    const matchesStatusFilter = (task: Task) => {
-      const { isToday, isOverdue, isUnscheduled, isBlocked } = getTaskStatus(task);
-
-      switch (activeFilter) {
-        case 'all':
-          return true;
-        case 'active':
-          return !task.completed;
-        case 'completed':
-          return task.completed;
-        case 'urgent':
-          return task.priority === 'high';
-        case 'blocked':
-          return isBlocked;
-        case 'overdue':
-          return isOverdue;
-        case 'unscheduled':
-          return isUnscheduled;
-        default:
-          return true;
-      }
-    };
-
-    const showTodayOnlyMode = ['all', 'active', 'completed', 'urgent'].includes(activeFilter);
-
-    return tasks
-      .filter(task => {
-        if (!matchesSearchFilter(task)) return false;
-        if (!matchesCategoryFilter(task)) return false;
-        if (!matchesStatusFilter(task)) return false;
-
-        // In dashboard mode, only show today's tasks (unless a smart folder is active)
-        if (showTodayOnlyMode && activeCategory !== 'smart') {
-          return getTaskStatus(task).isToday;
-        }
-
-        return true;
-      })
-      .filter(task => {
-        // Advanced filters
-        if (advancedFilters.dateFrom && (!task.dueDate || task.dueDate < advancedFilters.dateFrom)) return false;
-        if (advancedFilters.dateTo && (!task.dueDate || task.dueDate > advancedFilters.dateTo)) return false;
-        if (advancedFilters.priorities?.length && !advancedFilters.priorities.includes(task.priority)) return false;
-        return true;
-      })
-      .sort((a, b) => {
-        if (a.dueTime && b.dueTime) return a.dueTime.localeCompare(b.dueTime);
-        if (a.dueTime) return -1;
-        if (b.dueTime) return 1;
-        return 0;
-      });
+    return filterTasks(tasks, {
+      searchQuery,
+      activeCategory,
+      activeFilter: activeFilter as any,
+      advancedFilters,
+      todayStr,
+      tasks,
+    });
   }, [tasks, searchQuery, activeCategory, activeFilter, advancedFilters]);
 
   const watchedTasks = React.useMemo(() => {
@@ -246,6 +188,85 @@ export default function App() {
     if (task) setEditingTask(task);
   }, [tasks]);
 
+  const handleNavigateToDailyView = React.useCallback((date: Date) => {
+    setSelectedDailyDate(date);
+    setCurrentTab('daily');
+  }, []);
+
+  // Catch-up carry-forward on app load for multi-day gaps
+  React.useEffect(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const lastOpened = localStorage.getItem('lastOpenedDate');
+
+    if (lastOpened && lastOpened !== today) {
+      let totalCarried = 0;
+
+      setTasks(prev => {
+        let allTasks = [...prev];
+
+        // Parse the last opened date
+        const [lyear, lmonth, lday] = lastOpened.split('-').map(Number);
+        let currentDate = new Date(lyear, lmonth - 1, lday);
+
+        // Carry forward tasks for each day from lastOpened to today
+        while (format(currentDate, 'yyyy-MM-dd') < today) {
+          const fromDate = format(currentDate, 'yyyy-MM-dd');
+          const nextDate = addDays(currentDate, 1);
+          const toDate = format(nextDate, 'yyyy-MM-dd');
+
+          // Find incomplete tasks from fromDate
+          const incompleteTasks = allTasks.filter(t => t.dueDate === fromDate && !t.completed);
+          // Find existing tasks on toDate to check for duplicates
+          const tasksOnToDate = allTasks.filter(t => t.dueDate === toDate);
+          const taskNamesOnToDate = new Set(tasksOnToDate.map(t => t.title.toLowerCase()));
+
+          // Create new instances of non-duplicate tasks on toDate
+          const newTasks = incompleteTasks
+            .filter(t => !taskNamesOnToDate.has(t.title.toLowerCase()))
+            .map(t => ({
+              ...t,
+              id: crypto.randomUUID(),
+              dueDate: toDate,
+              createdAt: Date.now(),
+            }));
+
+          totalCarried += newTasks.length;
+          allTasks = [...newTasks, ...allTasks];
+          currentDate = nextDate;
+        }
+
+        return allTasks;
+      });
+
+      if (totalCarried > 0) {
+        toast.success(`Caught up: ${totalCarried} task${totalCarried > 1 ? 's' : ''} carried forward`, {
+          duration: 3000
+        });
+      }
+    }
+
+    // Store today's date as the last opened date
+    localStorage.setItem('lastOpenedDate', today);
+  }, []);
+
+  // Auto-carry forward incomplete tasks when daily date changes
+  React.useEffect(() => {
+    const previousDay = addDays(selectedDailyDate, -1);
+    const previousDayStr = format(previousDay, 'yyyy-MM-dd');
+    const currentDayStr = format(selectedDailyDate, 'yyyy-MM-dd');
+
+    const incompleteTasksOnPreviousDay = tasks.filter(t =>
+      t.dueDate === previousDayStr && !t.completed
+    ).length;
+
+    if (incompleteTasksOnPreviousDay > 0) {
+      carryForwardIncompleteTasks(previousDayStr, currentDayStr);
+      toast.success(`${incompleteTasksOnPreviousDay} task${incompleteTasksOnPreviousDay > 1 ? 's' : ''} carried forward`, {
+        duration: 2000
+      });
+    }
+  }, [selectedDailyDate, tasks, carryForwardIncompleteTasks]);
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -262,6 +283,21 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
+
+  // Housekeeping: save currentTab and lastOpenedDate on app close
+  // (tasks/categories are saved automatically by useTasks.ts effects)
+  const housekeepingRef = React.useRef({ currentTab });
+  housekeepingRef.current = { currentTab };
+
+  React.useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.setItem('lastOpenedDate', format(new Date(), 'yyyy-MM-dd'));
+      localStorage.setItem('currentTab', housekeepingRef.current.currentTab);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-background overflow-hidden font-sans">
@@ -308,7 +344,7 @@ export default function App() {
           isVisible={isAdvancedFilterOpen}
         />
 
-        <Tabs defaultValue="focus" className="flex-1 overflow-hidden flex flex-col max-w-[1200px] mx-auto w-full">
+        <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'focus' | 'daily' | 'calendar')} className="flex-1 overflow-hidden flex flex-col max-w-[1200px] mx-auto w-full">
           <div className="flex items-center justify-between shrink-0 sticky top-0 z-20 bg-[#f7fafd] px-4 pt-4 pb-3 border-b border-slate-100/60">
             <TabsList className="bg-slate-100 p-1 w-fit border-none">
               <TabsTrigger value="focus" className="rounded-lg text-xs font-black uppercase tracking-wider px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm">
@@ -349,7 +385,7 @@ export default function App() {
 
           <div className="flex-1 overflow-auto px-4 pb-4">
             <TabsContent value="focus" className="flex-1 m-0 flex flex-col gap-4 overflow-visible">
-              <DashboardView 
+              <DashboardView
               tasks={tasks}
               filteredTasks={filteredTasks}
               watchedTasks={watchedTasks}
@@ -363,6 +399,7 @@ export default function App() {
               setEditingTask={setEditingTask}
               setIsDialogOpen={setIsDialogOpen}
               getPriorityColor={getPriorityColor}
+              onNavigateToDailyView={handleNavigateToDailyView}
               />
             </TabsContent>
 

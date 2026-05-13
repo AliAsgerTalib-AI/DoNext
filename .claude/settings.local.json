@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\DoNext\\\\src\\\\components\\\\ui\" -Name)",
+      "Bash(Select-Object -First 15)",
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\DoNext\" -Force)",
+      "Bash(Select-Object Name, BaseName, Extension)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'docs: Add comprehensive marketing guide for DoNext *)",
+      "Bash(static\")",
+      "PowerShell(New-Item *)",
+      "Bash(curl -s http://localhost:3003)",
+      "Bash(curl -s http://localhost:3010)",
+      "Bash(curl *)"
+    ]
+  }
+}
