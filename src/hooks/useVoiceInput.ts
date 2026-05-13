@@ -194,10 +194,9 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
       const result = final.trim() || interim.trim();
       if (result) {
         setTranscript(result);
-        // Only call onResult when we have a final result
-        if (final.trim()) {
-          onResultRef.current?.(final.trim());
-        }
+        // Call onResult with whatever we have (interim or final)
+        // This ensures we capture what the user is saying
+        onResultRef.current?.(result);
       }
     };
 

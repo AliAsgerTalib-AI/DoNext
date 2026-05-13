@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useVoiceInput, parseVoiceTranscript } from '@/src/hooks/useVoiceInput';
 import { Task } from '@/src/types';
+import { toast } from 'sonner';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -31,8 +32,17 @@ interface HeaderProps {
 export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onVoiceAdd, onClockClick }: HeaderProps) => {
   const [voiceTranscript, setVoiceTranscript] = React.useState('');
 
+  React.useEffect(() => {
+    console.log('🎤 Header rendering - Voice support:', {
+      onVoiceAdd: !!onVoiceAdd,
+      isListening: false,
+      micSupported: true
+    });
+  }, [onVoiceAdd]);
+
   const handleVoiceResult = React.useCallback((transcript: string) => {
     // Accumulate transcripts as user speaks
+    console.log('📝 Voice transcript:', transcript);
     setVoiceTranscript(transcript);
   }, []);
 
@@ -40,18 +50,29 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
 
   // When user clicks stop button, process the full transcript
   const handleMicClick = React.useCallback(() => {
+    console.log('🎤 Mic button clicked - isListening:', isListening, 'transcript:', voiceTranscript);
+
     if (isListening) {
       // User is stopping - process the voice input
+      console.log('⏹️ Stopping - voiceTranscript:', voiceTranscript);
       if (voiceTranscript.trim()) {
+        console.log('✅ Processing transcript:', voiceTranscript);
         const taskData = parseVoiceTranscript(voiceTranscript);
+        console.log('✅ Parsed task data:', taskData);
         onVoiceAdd?.(taskData);
+        toast.success(`Created: "${taskData.title}"`);
         setVoiceTranscript('');
+      } else {
+        console.log('❌ No transcript found');
+        toast.info('No speech detected');
       }
       stopListening();
     } else {
       // Start listening
+      console.log('▶️ Starting microphone');
       setVoiceTranscript('');
       startListening();
+      toast.info('Listening... speak now');
     }
   }, [isListening, voiceTranscript, onVoiceAdd, stopListening, startListening]);
   return (
