@@ -339,6 +339,10 @@ export default function App() {
             addTask(taskData);
             toast.success(`Task added: "${taskData.title || 'Untitled Task'}"`);
           }}
+          onClockClick={() => {
+            setCurrentTab('daily');
+            setSelectedDailyDate(new Date());
+          }}
         />
 
         <AdvancedFilterBar

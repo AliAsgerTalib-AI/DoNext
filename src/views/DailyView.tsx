@@ -61,19 +61,22 @@ export const DailyView = React.memo(({
   const timedTasks = React.useMemo(() => dayTasks.filter(t => t.dueTime), [dayTasks]);
   const untimedTasks = React.useMemo(() => dayTasks.filter(t => !t.dueTime), [dayTasks]);
 
-  // Auto-scroll to current hour on mount and when date changes
+  const hasScrolledRef = React.useRef(false);
+
+  // Auto-scroll to current hour only once on initial mount when date is today
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isSameDay(today, new Date())) {
+    if (isSameDay(today, new Date()) && !hasScrolledRef.current) {
+      const timer = setTimeout(() => {
         const currentHour = new Date().getHours();
         const element = document.getElementById(`daily-hour-${currentHour}`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          hasScrolledRef.current = true;
         }
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [today]);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const getPriorityBadge = (priority: string) => {
     const badges: Record<string, { icon: string; color: string }> = {

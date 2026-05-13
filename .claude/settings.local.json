@@ -19,7 +19,8 @@
       "Bash(curl *)",
       "Bash(awk '{print $2}')",
       "Bash(xargs kill -9)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(pkill -f \"npm run dev\")"
     ]
   }
 }

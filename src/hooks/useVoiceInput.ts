@@ -1,6 +1,7 @@
 import React from 'react';
 import { Task } from '@/src/types';
 import { format, addDays } from 'date-fns';
+import { toast } from 'sonner';
 
 export function parseVoiceTranscript(text: string): Partial<Task> {
   const lowerText = text.toLowerCase();
@@ -71,6 +72,8 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
   const [error, setError] = React.useState<string | null>(null);
 
   const recognitionRef = React.useRef<any>(null);
+  const onResultRef = React.useRef(onResult);
+
   const [isSupported] = React.useState(() => {
     if (typeof window === 'undefined') return false;
     return !!(
@@ -78,6 +81,10 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
       (window as any).webkitSpeechRecognition
     );
   });
+
+  React.useEffect(() => {
+    onResultRef.current = onResult;
+  }, [onResult]);
 
   React.useEffect(() => {
     if (!isSupported) return;
@@ -105,7 +112,7 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
       if (final) {
         const cleanedTranscript = final.trim();
         setTranscript(cleanedTranscript);
-        onResult?.(cleanedTranscript);
+        onResultRef.current?.(cleanedTranscript);
       }
     };
 
@@ -116,6 +123,7 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
         ? 'Network error. Please check your connection.'
         : `Error: ${event.error}`;
       setError(errorMsg);
+      toast.error(errorMsg);
     };
 
     recognition.onend = () => {
@@ -127,7 +135,7 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
     return () => {
       recognition.abort();
     };
-  }, [isSupported, onResult]);
+  }, [isSupported]);
 
   const startListening = React.useCallback(() => {
     if (recognitionRef.current && !isListening) {

@@ -25,15 +25,16 @@ interface HeaderProps {
   canRedo?: boolean;
   onOpenSettings?: () => void;
   onVoiceAdd?: (taskData: Partial<Task>) => void;
+  onClockClick?: () => void;
 }
 
-export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onVoiceAdd }: HeaderProps) => {
-  const { isListening, isSupported, startListening, stopListening, error } = useVoiceInput(
-    (transcript) => {
-      const taskData = parseVoiceTranscript(transcript);
-      onVoiceAdd?.(taskData);
-    }
-  );
+export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onVoiceAdd, onClockClick }: HeaderProps) => {
+  const handleVoiceResult = React.useCallback((transcript: string) => {
+    const taskData = parseVoiceTranscript(transcript);
+    onVoiceAdd?.(taskData);
+  }, [onVoiceAdd]);
+
+  const { isListening, isSupported, startListening, stopListening, error } = useVoiceInput(handleVoiceResult);
   return (
     <header className="h-14 md:h-20 border-b bg-card px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-100 shrink-0">
       {/* Hamburger Menu - Mobile Only */}
@@ -131,14 +132,14 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
         )}
 
         <span className="hidden md:flex">
-          <HeaderClock />
+          <HeaderClock onClick={onClockClick} />
         </span>
       </div>
     </header>
   );
 });
 
-const HeaderClock = React.memo(() => {
+const HeaderClock = React.memo(({ onClick }: { onClick?: () => void }) => {
   const [currentTime, setCurrentTime] = React.useState(new Date());
 
   React.useEffect(() => {
@@ -147,9 +148,13 @@ const HeaderClock = React.memo(() => {
   }, []);
 
   return (
-    <div className="flex flex-col items-end">
+    <button
+      onClick={onClick}
+      className="flex flex-col items-end cursor-pointer hover:text-primary/80 transition-colors"
+      title="Go to Daily View"
+    >
       <span className="text-[11px] font-black text-slate-900 uppercase tracking-wider">{format(currentTime, 'EEEE, MMMM do')}</span>
       <span className="text-2xl font-display font-black text-primary tabular-nums tracking-tight leading-none mt-1">{format(currentTime, 'pp')}</span>
-    </div>
+    </button>
   );
 });
