@@ -29,17 +29,31 @@ interface HeaderProps {
 }
 
 export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onVoiceAdd, onClockClick }: HeaderProps) => {
-  const stopListeningRef = React.useRef<(() => void) | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = React.useState('');
 
   const handleVoiceResult = React.useCallback((transcript: string) => {
-    const taskData = parseVoiceTranscript(transcript);
-    onVoiceAdd?.(taskData);
-    // Auto-stop listening after a successful result
-    setTimeout(() => stopListeningRef.current?.(), 100);
-  }, [onVoiceAdd]);
+    // Accumulate transcripts as user speaks
+    setVoiceTranscript(transcript);
+  }, []);
 
-  const { isListening, isSupported, startListening, stopListening, error } = useVoiceInput(handleVoiceResult);
-  stopListeningRef.current = stopListening;
+  const { isListening, isSupported, startListening, stopListening, transcript: micTranscript } = useVoiceInput(handleVoiceResult);
+
+  // When user clicks stop button, process the full transcript
+  const handleMicClick = React.useCallback(() => {
+    if (isListening) {
+      // User is stopping - process the voice input
+      if (voiceTranscript.trim()) {
+        const taskData = parseVoiceTranscript(voiceTranscript);
+        onVoiceAdd?.(taskData);
+        setVoiceTranscript('');
+      }
+      stopListening();
+    } else {
+      // Start listening
+      setVoiceTranscript('');
+      startListening();
+    }
+  }, [isListening, voiceTranscript, onVoiceAdd, stopListening, startListening]);
   return (
     <header className="h-14 md:h-20 border-b bg-card px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-100 shrink-0">
       {/* Hamburger Menu - Mobile Only */}
@@ -125,12 +139,12 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
           <Button
             variant={isListening ? 'secondary' : 'ghost'}
             size="icon"
-            onClick={() => isListening ? stopListening() : startListening()}
+            onClick={handleMicClick}
             className={cn(
               'h-11 w-11 rounded-xl transition-all',
               isListening && 'animate-pulse'
             )}
-            title={isListening ? 'Listening...' : 'Add task by voice'}
+            title={isListening ? `Listening: "${voiceTranscript}"... (click to stop)` : 'Add task by voice'}
           >
             {isListening ? <MicOff className="w-4 h-4 text-red-500" /> : <Mic className="w-4 h-4" />}
           </Button>
