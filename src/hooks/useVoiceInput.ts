@@ -209,6 +209,7 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
 
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         const transcript = event.results[i][0].transcript;
+        console.log(`🎤 Result received (isFinal: ${event.results[i].isFinal}): "${transcript}"`);
         if (event.results[i].isFinal) {
           final += transcript + ' ';
         } else {
@@ -217,7 +218,10 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
       }
 
       const result = final.trim() || interim.trim();
+      console.log(`📝 Combined result: final="${final.trim()}" interim="${interim.trim()}" → result="${result}"`);
+
       if (result) {
+        console.log(`✅ Updating transcript: "${result}"`);
         setTranscript(result);
         transcriptRef.current = result; // Update ref for silence detection
         // Update the last transcript time for silence detection
@@ -225,6 +229,8 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
         // Call onResult with whatever we have (interim or final)
         // This ensures we capture what the user is saying
         onResultRef.current?.(result);
+      } else {
+        console.log('⚠️ No result from onresult event');
       }
     };
 
@@ -289,17 +295,22 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
         const silenceThreshold = micPauseDuration * 1000; // Convert to milliseconds
         const timeSinceLastTranscript = Date.now() - lastTranscriptTimeRef.current;
 
+        console.log(`⏱️ Silence check: ${timeSinceLastTranscript}ms since last transcript (threshold: ${silenceThreshold}ms), transcript: "${transcriptRef.current}"`);
+
         if (timeSinceLastTranscript > silenceThreshold && shouldAutoStopRef.current) {
           console.log('🔇 Silence detected - auto-stopping microphone');
           shouldAutoStopRef.current = false;
 
           // Trigger auto-stop callback with current transcript (use ref to get latest value)
           const currentTranscript = transcriptRef.current;
+          console.log('📋 Current transcript in ref:', JSON.stringify(currentTranscript));
+          console.log('📋 Is trimmed empty?:', !currentTranscript.trim());
+
           if (currentTranscript.trim()) {
             console.log('📤 Triggering auto-stop with transcript:', currentTranscript);
             onAutoStop?.(currentTranscript);
           } else {
-            console.log('❌ No transcript to process at auto-stop');
+            console.log('❌ No transcript to process at auto-stop - transcript is empty or whitespace only');
           }
 
           recognitionRef.current?.abort();
