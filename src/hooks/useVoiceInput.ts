@@ -48,12 +48,27 @@ function parseDate(text: string): string | null {
     }
   }
 
-  // Check for month + day (e.g., "January 15", "Dec 25")
-  const monthMatch = text.match(/(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)/i);
-  if (monthMatch) {
+  // Check for month + day patterns (handles both "January 15" and "15 January")
+  // Pattern 1: month day (e.g., "January 15", "Jan 15")
+  const monthDayMatch = text.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})/i);
+  if (monthDayMatch) {
     try {
-      const day = monthMatch[1];
-      const month = monthMatch[2];
+      const month = monthDayMatch[1];
+      const day = monthDayMatch[2];
+      const dateStr = `${month} ${day} ${today.getFullYear()}`;
+      const parsed = parse(dateStr, 'MMM d yyyy', today);
+      return format(parsed, 'yyyy-MM-dd');
+    } catch (e) {
+      // Invalid date, skip
+    }
+  }
+
+  // Pattern 2: day month (e.g., "15 January", "15 Jan")
+  const dayMonthMatch = text.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)/i);
+  if (dayMonthMatch) {
+    try {
+      const day = dayMonthMatch[1];
+      const month = dayMonthMatch[2];
       const dateStr = `${month} ${day} ${today.getFullYear()}`;
       const parsed = parse(dateStr, 'MMM d yyyy', today);
       return format(parsed, 'yyyy-MM-dd');
@@ -87,9 +102,9 @@ export function parseVoiceTranscript(text: string): Partial<Task> {
     dueDate = parseDate(text);
   }
 
-  // Extract time (e.g., "10am", "3:30pm", "14:00")
+  // Extract time (e.g., "10am", "10 am", "3:30pm", "3:30 pm", "14:00")
   let dueTime: string | null = null;
-  const timeMatch = text.match(/(\d{1,2}):?(\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?/i);
+  const timeMatch = text.match(/(\d{1,2}):?(\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)/i);
   if (timeMatch) {
     const parsed = parseTime(timeMatch[0]);
     if (parsed) dueTime = parsed;
@@ -113,8 +128,9 @@ export function parseVoiceTranscript(text: string): Partial<Task> {
     .replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
     .replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/gi, '')
     .replace(/\b(work|shopping|shop|health|personal)\b/gi, '')
+    .replace(/\b(\d{1,2})(?:\s*(?:st|nd|rd|th))?\b/gi, '') // Remove day numbers
     .replace(/(\d{1,2}):?(\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?/gi, '')
-    .replace(/\b(at|next)\b/gi, '')
+    .replace(/\b(at|next|on)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 
