@@ -202,53 +202,58 @@ export function useVoiceInput(onResult?: (transcript: string) => void): UseVoice
     };
 
     recognition.onerror = (event: any) => {
+      // Ignore 'aborted' errors (expected when user stops listening)
+      if (event.error === 'aborted') {
+        return;
+      }
+
       const errorMsg = event.error === 'no-speech'
         ? 'No speech detected. Please try again.'
         : event.error === 'network'
         ? 'Network error. Please check your connection.'
+        : event.error === 'permission-denied'
+        ? 'Microphone permission denied. Please allow access in your browser settings.'
         : `Error: ${event.error}`;
-      setError(errorMsg);
-      toast.error(errorMsg);
-    };
 
-    recognition.onend = () => {
-      // Auto-restart listening to keep the mic active longer
-      // Unless the user has manually stopped it
-      if (recognitionRef.current && (recognitionRef.current as any).shouldContinue) {
-        try {
-          recognition.start();
-        } catch (e) {
-          // Already started or other error, ignore
-        }
-      } else {
-        setIsListening(false);
+      setError(errorMsg);
+      if (event.error !== 'aborted') {
+        toast.error(errorMsg);
       }
     };
 
-    (recognition as any).shouldContinue = true;
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
     recognitionRef.current = recognition;
 
     return () => {
-      (recognition as any).shouldContinue = false;
-      recognition.abort();
+      try {
+        recognition.abort();
+      } catch (e) {
+        // Ignore abort errors
+      }
     };
   }, [isSupported]);
 
   const startListening = React.useCallback(() => {
     if (recognitionRef.current && !isListening) {
-      (recognitionRef.current as any).shouldContinue = true;
+      setError(null);
       try {
         recognitionRef.current.start();
       } catch (e) {
-        // Already started or other error
+        console.warn('Failed to start listening:', e);
       }
     }
   }, [isListening]);
 
   const stopListening = React.useCallback(() => {
     if (recognitionRef.current) {
-      (recognitionRef.current as any).shouldContinue = false;
-      recognitionRef.current.abort();
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {
+        // Ignore errors during abort
+      }
       setIsListening(false);
     }
   }, []);
