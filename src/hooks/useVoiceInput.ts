@@ -169,6 +169,7 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
 
   const recognitionRef = React.useRef<any>(null);
   const onResultRef = React.useRef(onResult);
+  const transcriptRef = React.useRef(''); // Track transcript in real-time for silence detection
   const lastTranscriptTimeRef = React.useRef<number>(0);
   const silenceCheckIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
   const shouldAutoStopRef = React.useRef(false);
@@ -218,6 +219,7 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
       const result = final.trim() || interim.trim();
       if (result) {
         setTranscript(result);
+        transcriptRef.current = result; // Update ref for silence detection
         // Update the last transcript time for silence detection
         lastTranscriptTimeRef.current = Date.now();
         // Call onResult with whatever we have (interim or final)
@@ -267,6 +269,7 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
   const startListening = React.useCallback(() => {
     if (recognitionRef.current && !isListening) {
       setError(null);
+      transcriptRef.current = ''; // Reset transcript for new recording
       lastTranscriptTimeRef.current = Date.now();
       shouldAutoStopRef.current = true;
 
@@ -290,10 +293,13 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
           console.log('🔇 Silence detected - auto-stopping microphone');
           shouldAutoStopRef.current = false;
 
-          // Trigger auto-stop callback with current transcript
-          if (transcript.trim()) {
-            console.log('📤 Triggering auto-stop with transcript:', transcript);
-            onAutoStop?.(transcript);
+          // Trigger auto-stop callback with current transcript (use ref to get latest value)
+          const currentTranscript = transcriptRef.current;
+          if (currentTranscript.trim()) {
+            console.log('📤 Triggering auto-stop with transcript:', currentTranscript);
+            onAutoStop?.(currentTranscript);
+          } else {
+            console.log('❌ No transcript to process at auto-stop');
           }
 
           recognitionRef.current?.abort();
