@@ -102,6 +102,11 @@ export function parseVoiceTranscript(text: string): Partial<Task> {
     dueDate = parseDate(text);
   }
 
+  // Default to today if no date found
+  if (!dueDate) {
+    dueDate = format(new Date(), 'yyyy-MM-dd');
+  }
+
   // Extract time (e.g., "10am", "10 am", "3:30pm", "3:30 pm", "14:00")
   let dueTime: string | null = null;
   const timeMatch = text.match(/(\d{1,2}):?(\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)/i);

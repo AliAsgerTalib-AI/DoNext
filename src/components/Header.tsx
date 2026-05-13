@@ -44,21 +44,27 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
     // Auto-stop triggered by silence detection
     console.log('🔇 AUTO-STOP triggered with transcript:', transcript);
     if (transcript.trim()) {
-      console.log('✅ PROCESSING auto-stop transcript:', transcript);
-      const taskData = parseVoiceTranscript(transcript);
-      console.log('✅ PARSED auto-stop data:', taskData);
+      try {
+        console.log('✅ PROCESSING auto-stop transcript:', transcript);
+        const taskData = parseVoiceTranscript(transcript);
+        console.log('✅ PARSED auto-stop data:', taskData);
+        console.log('✅ Task will have dueDate:', taskData.dueDate || 'NULL (unscheduled)');
 
-      if (onVoiceAdd) {
-        console.log('🔔 CALLING onVoiceAdd from auto-stop with:', taskData);
-        onVoiceAdd(taskData);
-        console.log('✔️ onVoiceAdd called successfully');
-      } else {
-        console.log('❌ ERROR: onVoiceAdd is undefined!');
+        if (onVoiceAdd) {
+          console.log('🔔 CALLING onVoiceAdd from auto-stop with:', taskData);
+          onVoiceAdd(taskData);
+          console.log('✔️ onVoiceAdd called successfully');
+        } else {
+          console.log('❌ ERROR: onVoiceAdd is undefined!');
+        }
+
+        toast.success(`Created: "${taskData.title}"`);
+        voiceTranscriptRef.current = '';
+        setVoiceTranscript('');
+      } catch (error) {
+        console.error('❌ ERROR in handleAutoStop:', error);
+        toast.error('Failed to create task from voice');
       }
-
-      toast.success(`Created: "${taskData.title}"`);
-      voiceTranscriptRef.current = '';
-      setVoiceTranscript('');
     }
   }, [onVoiceAdd]);
 
@@ -72,21 +78,27 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
       console.log('⏹️ STOPPING - transcript:', transcript);
 
       if (transcript.trim()) {
-        console.log('✅ PROCESSING:', transcript);
-        const taskData = parseVoiceTranscript(transcript);
-        console.log('✅ PARSED DATA:', taskData);
+        try {
+          console.log('✅ PROCESSING:', transcript);
+          const taskData = parseVoiceTranscript(transcript);
+          console.log('✅ PARSED DATA:', taskData);
+          console.log('✅ Task will have dueDate:', taskData.dueDate || 'NULL (unscheduled)');
 
-        if (onVoiceAdd) {
-          console.log('🔔 CALLING onVoiceAdd with:', taskData);
-          onVoiceAdd(taskData);
-          console.log('✔️ onVoiceAdd called successfully');
-        } else {
-          console.log('❌ ERROR: onVoiceAdd is undefined!');
+          if (onVoiceAdd) {
+            console.log('🔔 CALLING onVoiceAdd with:', taskData);
+            onVoiceAdd(taskData);
+            console.log('✔️ onVoiceAdd called successfully');
+          } else {
+            console.log('❌ ERROR: onVoiceAdd is undefined!');
+          }
+
+          toast.success(`Created: "${taskData.title}"`);
+          voiceTranscriptRef.current = '';
+          setVoiceTranscript('');
+        } catch (error) {
+          console.error('❌ ERROR in handleMicClick:', error);
+          toast.error('Failed to create task from voice');
         }
-
-        toast.success(`Created: "${taskData.title}"`);
-        voiceTranscriptRef.current = '';
-        setVoiceTranscript('');
       } else {
         console.log('❌ NO TRANSCRIPT');
         toast.info('No speech detected');

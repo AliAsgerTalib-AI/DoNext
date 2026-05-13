@@ -20,7 +20,10 @@
       "Bash(awk '{print $2}')",
       "Bash(xargs kill -9)",
       "Read(//tmp/**)",
-      "Bash(pkill -f \"npm run dev\")"
+      "Bash(pkill -f \"npm run dev\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr LISTENING)",
+      "Bash(findstr -E \":\\(3000|5173|5174\\)\")"
     ]
   }
 }

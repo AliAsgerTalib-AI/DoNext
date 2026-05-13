@@ -81,6 +81,7 @@ export function useTasks() {
 
   React.useEffect(() => {
     localStorage.setItem('chronos-tasks', JSON.stringify(tasks));
+    console.log('💾 Tasks saved to localStorage:', tasks.length, 'tasks');
   }, [tasks]);
 
   React.useEffect(() => {

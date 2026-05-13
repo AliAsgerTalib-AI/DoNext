@@ -334,8 +334,15 @@ export default function App() {
           canRedo={canRedo}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onVoiceAdd={(taskData) => {
-            addTask(taskData);
-            toast.success(`Task added: "${taskData.title || 'Untitled Task'}"`);
+            try {
+              console.log('📱 App.tsx onVoiceAdd called with:', taskData);
+              addTask(taskData);
+              console.log('✅ Task added to state, total tasks:', tasks.length);
+              toast.success(`Task added: "${taskData.title || 'Untitled Task'}"`);
+            } catch (error) {
+              console.error('❌ ERROR in onVoiceAdd:', error);
+              toast.error('Failed to add task');
+            }
           }}
           onClockClick={() => {
             setCurrentTab('daily');
