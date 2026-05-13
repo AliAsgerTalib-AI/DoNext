@@ -4,11 +4,13 @@
  */
 
 import * as React from 'react';
-import { Search, SlidersHorizontal, Settings, Undo2, Redo2, Menu } from 'lucide-react';
+import { Search, SlidersHorizontal, Settings, Undo2, Redo2, Menu, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useVoiceInput, parseVoiceTranscript } from '@/src/hooks/useVoiceInput';
+import { Task } from '@/src/types';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -22,9 +24,16 @@ interface HeaderProps {
   canUndo?: boolean;
   canRedo?: boolean;
   onOpenSettings?: () => void;
+  onVoiceAdd?: (taskData: Partial<Task>) => void;
 }
 
-export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings }: HeaderProps) => {
+export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onVoiceAdd }: HeaderProps) => {
+  const { isListening, isSupported, startListening, stopListening, error } = useVoiceInput(
+    (transcript) => {
+      const taskData = parseVoiceTranscript(transcript);
+      onVoiceAdd?.(taskData);
+    }
+  );
   return (
     <header className="h-14 md:h-20 border-b bg-card px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-100 shrink-0">
       {/* Hamburger Menu - Mobile Only */}
@@ -103,6 +112,21 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
             title="Settings"
           >
             <Settings className="w-4 h-4" />
+          </Button>
+        )}
+
+        {onVoiceAdd && isSupported && (
+          <Button
+            variant={isListening ? 'secondary' : 'ghost'}
+            size="icon"
+            onClick={() => isListening ? stopListening() : startListening()}
+            className={cn(
+              'h-11 w-11 rounded-xl transition-all',
+              isListening && 'animate-pulse'
+            )}
+            title={isListening ? 'Listening...' : 'Add task by voice'}
+          >
+            {isListening ? <MicOff className="w-4 h-4 text-red-500" /> : <Mic className="w-4 h-4" />}
           </Button>
         )}
 

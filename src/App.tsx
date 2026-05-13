@@ -335,6 +335,10 @@ export default function App() {
           canUndo={canUndo}
           canRedo={canRedo}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onVoiceAdd={(taskData) => {
+            addTask(taskData);
+            toast.success(`Task added: "${taskData.title || 'Untitled Task'}"`);
+          }}
         />
 
         <AdvancedFilterBar
