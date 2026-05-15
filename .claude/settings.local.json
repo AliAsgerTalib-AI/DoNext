@@ -23,7 +23,9 @@
       "Bash(pkill -f \"npm run dev\")",
       "Bash(netstat -ano)",
       "Bash(findstr LISTENING)",
-      "Bash(findstr -E \":\\(3000|5173|5174\\)\")"
+      "Bash(findstr -E \":\\(3000|5173|5174\\)\")",
+      "Bash(cat vite.config.ts)",
+      "Bash(cat vite.config.js)"
     ]
   }
 }
