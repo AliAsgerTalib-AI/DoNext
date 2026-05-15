@@ -30,7 +30,6 @@ import { Header } from './components/Header';
 import { DashboardView } from './views/DashboardView';
 import { DailyView } from './views/DailyView';
 import { CalendarView } from './views/CalendarView';
-import { DevTools } from './components/DevTools';
 import { Footer } from './components/Footer';
 import { AdvancedFilterBar } from './components/AdvancedFilterBar';
 import { SettingsModal } from './components/SettingsModal';
@@ -310,13 +309,6 @@ export default function App() {
         categories={categories}
         onAddCategory={handleAddCategory}
         onEditCategory={handleEditCategory}
-      />
-
-      <DevTools
-        tasks={tasks}
-        categories={categories}
-        setTasks={setTasks}
-        setCategories={setCategories}
       />
 
       <main className="flex-1 flex flex-col min-w-0 bg-[#f7fafd]">
