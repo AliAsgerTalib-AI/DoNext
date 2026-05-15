@@ -36,7 +36,6 @@ import { AdvancedFilterBar } from './components/AdvancedFilterBar';
 import { SettingsModal } from './components/SettingsModal';
 import { BottomSheet } from './components/BottomSheet';
 import { QuickAddForm } from './components/QuickAddForm';
-import { DebugPanel } from './components/DebugPanel';
 import { Task, Category, Priority } from './types';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/sonner';
@@ -568,7 +567,6 @@ export default function App() {
         setCategories={setCategories}
       />
 
-      <DebugPanel />
     </div>
   );
 }
