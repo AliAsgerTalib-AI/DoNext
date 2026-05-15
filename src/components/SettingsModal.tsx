@@ -205,7 +205,7 @@ export const SettingsModal = React.memo(({
             </div>
           </div>
           <div className="border-t border-slate-100" />
-          VOICE INPUT DISABLED */
+          VOICE INPUT DISABLED */}
 
           {/* Backup Section */}
           <div className="space-y-3">
