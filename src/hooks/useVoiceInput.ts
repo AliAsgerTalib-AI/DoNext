@@ -80,6 +80,7 @@ function parseDate(text: string): string | null {
   return null;
 }
 
+/* VOICE INPUT DISABLED - uncomment to re-enable
 export function parseVoiceTranscript(text: string): Partial<Task> {
   const lowerText = text.toLowerCase();
 
@@ -345,3 +346,4 @@ export function useVoiceInput(onResult?: (transcript: string) => void, onAutoSto
     stopListening,
   };
 }
+VOICE INPUT DISABLED */

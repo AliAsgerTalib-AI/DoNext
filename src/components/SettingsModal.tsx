@@ -158,6 +158,7 @@ export const SettingsModal = React.memo(({
     }
   }, [tasks, categories, setTasks, setCategories, onOpenChange]);
 
+  /* VOICE INPUT DISABLED
   const [micPauseDuration, setMicPauseDuration] = React.useState(() => {
     const saved = localStorage.getItem('micPauseDuration');
     return saved ? parseInt(saved, 10) : 6;
@@ -167,6 +168,7 @@ export const SettingsModal = React.memo(({
     setMicPauseDuration(value);
     localStorage.setItem('micPauseDuration', String(value));
   };
+  VOICE INPUT DISABLED */
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -176,7 +178,7 @@ export const SettingsModal = React.memo(({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Microphone Settings Section */}
+          {/* VOICE INPUT DISABLED
           <div className="space-y-3">
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2">🎤 Microphone Settings</h3>
@@ -202,9 +204,8 @@ export const SettingsModal = React.memo(({
               </p>
             </div>
           </div>
-
-          {/* Divider */}
           <div className="border-t border-slate-100" />
+          VOICE INPUT DISABLED */
 
           {/* Backup Section */}
           <div className="space-y-3">

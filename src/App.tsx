@@ -333,6 +333,7 @@ export default function App() {
           canUndo={canUndo}
           canRedo={canRedo}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          /* VOICE INPUT DISABLED
           onVoiceAdd={(taskData) => {
             try {
               console.log('📱 App.tsx onVoiceAdd called with:', taskData);
@@ -344,6 +345,7 @@ export default function App() {
               toast.error('Failed to add task');
             }
           }}
+          VOICE INPUT DISABLED */
           onClockClick={() => {
             setCurrentTab('daily');
             setSelectedDailyDate(new Date());

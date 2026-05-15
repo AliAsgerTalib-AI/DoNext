@@ -4,14 +4,15 @@
  */
 
 import * as React from 'react';
-import { Search, SlidersHorizontal, Settings, Undo2, Redo2, Menu, Mic, MicOff } from 'lucide-react';
+import { Search, SlidersHorizontal, Settings, Undo2, Redo2, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { useVoiceInput, parseVoiceTranscript } from '@/src/hooks/useVoiceInput';
-import { Task } from '@/src/types';
-import { toast } from 'sonner';
+// VOICE INPUT DISABLED
+// import { cn } from '@/lib/utils';
+// import { useVoiceInput, parseVoiceTranscript } from '@/src/hooks/useVoiceInput';
+// import { Task } from '@/src/types';
+// import { toast } from 'sonner';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -25,11 +26,12 @@ interface HeaderProps {
   canUndo?: boolean;
   canRedo?: boolean;
   onOpenSettings?: () => void;
-  onVoiceAdd?: (taskData: Partial<Task>) => void;
+  // onVoiceAdd?: (taskData: Partial<Task>) => void; // VOICE INPUT DISABLED
   onClockClick?: () => void;
 }
 
-export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onVoiceAdd, onClockClick }: HeaderProps) => {
+export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, isAdvancedFilterOpen, onToggleAdvancedFilter, activeAdvancedFilterCount, onUndo, onRedo, canUndo, canRedo, onOpenSettings, onClockClick }: HeaderProps) => {
+  /* VOICE INPUT DISABLED
   const [voiceTranscript, setVoiceTranscript] = React.useState('');
   const voiceTranscriptRef = React.useRef('');
 
@@ -73,7 +75,6 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
   // When user clicks stop button, process the full transcript
   const handleMicClick = React.useCallback(() => {
     if (isListening) {
-      // User is stopping - process the voice input
       const transcript = voiceTranscriptRef.current;
       console.log('⏹️ STOPPING - transcript:', transcript);
 
@@ -105,7 +106,6 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
       }
       stopListening();
     } else {
-      // Start listening
       console.log('▶️ STARTING MICROPHONE');
       voiceTranscriptRef.current = '';
       setVoiceTranscript('');
@@ -113,6 +113,7 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
       toast.info('Listening... speak now');
     }
   }, [isListening, onVoiceAdd, stopListening, startListening]);
+  VOICE INPUT DISABLED */
   return (
     <header className="h-14 md:h-20 border-b bg-card px-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-slate-100 shrink-0">
       {/* Hamburger Menu - Mobile Only */}
@@ -194,6 +195,7 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
           </Button>
         )}
 
+        {/* VOICE INPUT DISABLED
         {onVoiceAdd && isSupported && (
           <Button
             variant={isListening ? 'secondary' : 'ghost'}
@@ -208,6 +210,7 @@ export const Header = React.memo(({ onMenuClick, searchQuery, setSearchQuery, is
             {isListening ? <MicOff className="w-4 h-4 text-red-500" /> : <Mic className="w-4 h-4" />}
           </Button>
         )}
+        VOICE INPUT DISABLED */}
 
         <span className="hidden md:flex">
           <HeaderClock onClick={onClockClick} />
